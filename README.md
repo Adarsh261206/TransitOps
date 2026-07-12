@@ -199,7 +199,7 @@ All accounts use password: `password123`
 - In-app notification centre
 
 ### 🔒 Role-Based Access Control
-- 5 roles with granular permissions
+- 4 roles with granular permissions
 - Every route and UI element respects permissions
 
 ### 📧 Email System
