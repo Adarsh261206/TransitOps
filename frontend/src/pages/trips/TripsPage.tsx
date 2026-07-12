@@ -18,6 +18,7 @@ import { useToast } from '@/components/shared/Toast';
 import { useSearchParams } from 'react-router-dom';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
 import { usePermission } from '../../components/auth/PermissionGuard';
+import { validateRequired, validateNumber, validateDateString, type FieldError } from '../../utils/validation';
 
 const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   DRAFT: 'outline', DISPATCHED: 'secondary', COMPLETED: 'default', CANCELLED: 'destructive',
@@ -169,6 +170,8 @@ function TripWizard({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
   const [form, setForm] = useState({ source: '', destination: '', vehicleId: '', driverId: '', cargoWeight: 0, plannedDistance: 0, revenue: 0, goodsType: '', priority: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<FieldError[]>([]);
+  const { toast } = useToast();
 
   const { data: vehicles } = useQuery({ queryKey: ['vehicles-available'], queryFn: async () => { const r = await api.get('/vehicles?status=AVAILABLE&limit=100'); return r.data.data as Vehicle[]; } });
   const { data: drivers } = useQuery({ queryKey: ['drivers-available'], queryFn: async () => { const r = await api.get('/drivers?status=AVAILABLE'); return r.data as Driver[]; } });
@@ -215,11 +218,66 @@ function TripWizard({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
   if (!form.driverId) warnings.push('No driver assigned.');
   if (!form.plannedDistance || form.plannedDistance <= 0) warnings.push('Planned distance not set.');
 
+  const validateStep = (stepIndex: number): boolean => {
+    const newErrors: FieldError[] = [];
+    const srcErr = validateRequired(form.source, 'Source');
+    const destErr = validateRequired(form.destination, 'Destination');
+    const vehErr = validateRequired(form.vehicleId, 'Vehicle');
+    const drvErr = validateRequired(form.driverId, 'Driver');
+    const wtErr = validateNumber(form.cargoWeight, 'Cargo Weight', 1);
+    const gtErr = validateRequired(form.goodsType, 'Goods Type');
+    const priErr = validateRequired(form.priority, 'Priority');
+
+    switch (stepIndex) {
+      case 0:
+        if (srcErr) newErrors.push({ field: 'source', message: srcErr });
+        break;
+      case 1:
+        if (destErr) newErrors.push({ field: 'destination', message: destErr });
+        break;
+      case 2:
+        if (vehErr) newErrors.push({ field: 'vehicleId', message: vehErr });
+        break;
+      case 3:
+        if (drvErr) newErrors.push({ field: 'driverId', message: drvErr });
+        break;
+      case 4:
+        if (wtErr) newErrors.push({ field: 'cargoWeight', message: wtErr });
+        break;
+      case 5:
+        break;
+      case 6:
+        if (gtErr) newErrors.push({ field: 'goodsType', message: gtErr });
+        break;
+      case 7:
+        if (priErr) newErrors.push({ field: 'priority', message: priErr });
+        break;
+      case 8:
+        if (srcErr) newErrors.push({ field: 'source', message: srcErr });
+        if (destErr) newErrors.push({ field: 'destination', message: destErr });
+        if (vehErr) newErrors.push({ field: 'vehicleId', message: vehErr });
+        if (drvErr) newErrors.push({ field: 'driverId', message: drvErr });
+        if (wtErr) newErrors.push({ field: 'cargoWeight', message: wtErr });
+        if (gtErr) newErrors.push({ field: 'goodsType', message: gtErr });
+        if (priErr) newErrors.push({ field: 'priority', message: priErr });
+        break;
+    }
+
+    setErrors(newErrors);
+    if (newErrors.length > 0) {
+      toast('Please fix errors', 'error');
+      return false;
+    }
+    return true;
+  };
+
   const handleNext = async () => {
     if (step < steps.length - 1) {
+      if (!validateStep(step)) return;
       setStep(s => s + 1);
       return;
     }
+    if (!validateStep(step)) return;
     setError('');
     setLoading(true);
     try {
@@ -227,7 +285,13 @@ function TripWizard({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
       const tripId = createRes.data.data?.id || createRes.data.id;
       await api.patch(`/trips/${tripId}/status`, { status: 'DISPATCHED' });
       onSuccess();
-    } catch (err: any) { setError(err.response?.data?.error || 'Failed to create trip'); } finally { setLoading(false); }
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to create trip';
+      setError(msg);
+      toast(msg, 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const current = steps[step];
@@ -249,19 +313,37 @@ function TripWizard({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
         <div className="mb-6">
           <h4 className="text-sm font-medium mb-3">{current.title}</h4>
           {current.type === 'select' ? (
-            <Select value={form[current.field as keyof typeof form] as string} onChange={e => setForm(f => ({ ...f, [current.field]: e.target.value }))} className="w-full" required>
-              <option value="">Select {current.title}</option>
-              {current.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </Select>
+            <>
+              <Select value={form[current.field as keyof typeof form] as string} onChange={e => setForm(f => ({ ...f, [current.field]: e.target.value }))} className="w-full" required>
+                <option value="">Select {current.title}</option>
+                {current.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </Select>
+              {errors.find(e => e.field === current.field) && (
+                <p className="text-sm text-destructive mt-1">{errors.find(e => e.field === current.field)!.message}</p>
+              )}
+            </>
           ) : current.type === 'searchable-select' ? (
-            <SearchableSelect
-              options={current.field === 'goodsType' ? goodsTypeOptions : priorityOptions}
-              value={form[current.field as keyof typeof form] as string}
-              onChange={v => setForm(f => ({ ...f, [current.field]: v }))}
-              placeholder={`Select ${current.title}`}
-            />
+            <>
+              <SearchableSelect
+                options={current.field === 'goodsType' ? goodsTypeOptions : priorityOptions}
+                value={form[current.field as keyof typeof form] as string}
+                onChange={v => setForm(f => ({ ...f, [current.field]: v }))}
+                placeholder={`Select ${current.title}`}
+              />
+              {errors.find(e => e.field === current.field) && (
+                <p className="text-sm text-destructive mt-1">{errors.find(e => e.field === current.field)!.message}</p>
+              )}
+            </>
           ) : current.type === 'review' ? (
             <div className="space-y-3">
+              {errors.length > 0 && (
+                <div className="rounded-lg bg-destructive/10 p-3">
+                  <p className="text-xs font-semibold text-destructive mb-1">Errors</p>
+                  <ul className="text-xs text-destructive/80 space-y-0.5">
+                    {errors.map((e, i) => <li key={i}>• {e.message}</li>)}
+                  </ul>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg bg-muted/50 p-3">
                   <p className="text-xs text-muted-foreground">Vehicle</p>
@@ -306,7 +388,12 @@ function TripWizard({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
               )}
             </div>
           ) : (
-            <Input type={current.type} placeholder={current.placeholder} value={(form[current.field as keyof typeof form] as number || '') as any} onChange={e => setForm(f => ({ ...f, [current.field]: current.type === 'number' ? Number(e.target.value) : e.target.value }))} required min={0} />
+            <>
+              <Input type={current.type} placeholder={current.placeholder} value={(form[current.field as keyof typeof form] as number || '') as any} onChange={e => setForm(f => ({ ...f, [current.field]: current.type === 'number' ? Number(e.target.value) : e.target.value }))} required min={0} />
+              {errors.find(e => e.field === current.field) && (
+                <p className="text-sm text-destructive mt-1">{errors.find(e => e.field === current.field)!.message}</p>
+              )}
+            </>
           )}
         </div>
 
@@ -317,7 +404,7 @@ function TripWizard({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
         {error && <p className="text-sm text-destructive mb-4">{error}</p>}
 
         <div className="flex justify-between">
-          <Button variant="outline" onClick={step === 0 ? onClose : () => setStep(s => s - 1)} disabled={loading}>
+          <Button variant="outline" onClick={step === 0 ? onClose : () => { setErrors([]); setStep(s => s - 1); }} disabled={loading}>
             {step === 0 ? 'Cancel' : <><ChevronLeft className="h-4 w-4 mr-1" /> Back</>}
           </Button>
           <Button onClick={handleNext} disabled={loading}>
@@ -331,6 +418,18 @@ function TripWizard({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
 
 function CompleteTripDialog({ trip, onSubmit, onClose, loading }: { trip: Trip; onSubmit: (data: any) => void; onClose: () => void; loading: boolean }) {
   const [form, setForm] = useState({ actualDistance: 0, fuelConsumed: 0, finalOdometer: 0, revenue: trip.revenue || 0, toll: 0, remarks: '' });
+  const [completeErrors, setCompleteErrors] = useState<FieldError[]>([]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newErrors: FieldError[] = [];
+    if (form.toll < 0) {
+      newErrors.push({ field: 'toll', message: 'Toll must be a positive number' });
+    }
+    setCompleteErrors(newErrors);
+    if (newErrors.length > 0) return;
+    onSubmit(form);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -338,12 +437,16 @@ function CompleteTripDialog({ trip, onSubmit, onClose, loading }: { trip: Trip; 
         <CardHeader><CardTitle>Complete Trip</CardTitle></CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground mb-4">{trip.source} → {trip.destination}. Enter completion details.</p>
-          <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="space-y-3">
+          <form onSubmit={handleSubmit} className="space-y-3">
             <div className="space-y-1"><label className="text-sm font-medium">Actual Distance (km)</label><Input type="number" value={form.actualDistance || ''} onChange={e => setForm(f => ({ ...f, actualDistance: Number(e.target.value) }))} required min={1} /></div>
             <div className="space-y-1"><label className="text-sm font-medium">Fuel Consumed (L)</label><Input type="number" step="0.1" value={form.fuelConsumed || ''} onChange={e => setForm(f => ({ ...f, fuelConsumed: Number(e.target.value) }))} required min={0} /></div>
             <div className="space-y-1"><label className="text-sm font-medium">Final Odometer (km)</label><Input type="number" value={form.finalOdometer || ''} onChange={e => setForm(f => ({ ...f, finalOdometer: Number(e.target.value) }))} required min={0} /></div>
             <div className="space-y-1"><label className="text-sm font-medium">Revenue ($)</label><Input type="number" value={form.revenue || ''} onChange={e => setForm(f => ({ ...f, revenue: Number(e.target.value) }))} min={0} /></div>
-            <div className="space-y-1"><label className="text-sm font-medium">Toll ($)</label><Input type="number" value={form.toll || ''} onChange={e => setForm(f => ({ ...f, toll: Number(e.target.value) }))} min={0} /></div>
+            <div className="space-y-1"><label className="text-sm font-medium">Toll ($)</label><Input type="number" value={form.toll || ''} onChange={e => setForm(f => ({ ...f, toll: Number(e.target.value) }))} min={0} />
+              {completeErrors.find(e => e.field === 'toll') && (
+                <p className="text-sm text-destructive">{completeErrors.find(e => e.field === 'toll')!.message}</p>
+              )}
+            </div>
             <div className="space-y-1"><label className="text-sm font-medium">Remarks</label><Input type="text" value={form.remarks} onChange={e => setForm(f => ({ ...f, remarks: e.target.value }))} placeholder="Any remarks..." /></div>
             <div className="flex gap-2 pt-2"><Button type="submit" disabled={loading}>{loading ? <Spinner /> : 'Complete Trip'}</Button><Button type="button" variant="outline" onClick={onClose}>Cancel</Button></div>
           </form>

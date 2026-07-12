@@ -17,6 +17,7 @@ import { Plus, Wrench, CheckCircle, Building2 } from 'lucide-react';
 import { useToast } from '@/components/shared/Toast';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
 import { usePermission } from '../../components/auth/PermissionGuard';
+import { validateRequired, validateNumber, validateDateString, type FieldError, getFieldError } from '../../utils/validation';
 
 export function MaintenancePage() {
   const [showForm, setShowForm] = useState(false);
@@ -86,17 +87,48 @@ function MaintenanceForm({ onClose, onSuccess }: { onClose: () => void; onSucces
   const [form, setForm] = useState({ vehicleId: '', description: '', type: 'Oil Change', cost: 0, date: new Date().toISOString().split('T')[0], vendor: '', priority: '', expectedCompletion: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<FieldError[]>([]);
+  const { toast } = useToast();
 
   const { data: vehicles } = useQuery({ queryKey: ['vehicles-all'], queryFn: async () => { const r = await api.get('/vehicles?limit=100'); return r.data.data as Vehicle[]; } });
+
+  function validate() {
+    const errs: FieldError[] = [];
+    const ve = validateRequired(form.vehicleId, 'Vehicle');
+    if (ve) errs.push({ field: 'vehicleId', message: ve });
+    const de = validateRequired(form.description, 'Service Description');
+    if (de) errs.push({ field: 'description', message: de });
+    const ce = validateNumber(form.cost, 'Cost', 1);
+    if (ce) errs.push({ field: 'cost', message: ce });
+    const dte = validateDateString(form.date, 'Date');
+    if (dte) errs.push({ field: 'date', message: dte });
+    if (form.expectedCompletion) {
+      const ece = validateDateString(form.expectedCompletion, 'Expected Completion');
+      if (ece) errs.push({ field: 'expectedCompletion', message: ece });
+    }
+    return errs;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    const errs = validate();
+    setErrors(errs);
+    if (errs.length > 0) {
+      toast('Please fix errors', 'error');
+      return;
+    }
     setLoading(true);
     try {
       await api.post('/maintenance', form);
+      toast('Maintenance logged successfully', 'success');
       onSuccess();
-    } catch (err: any) { setError(err.response?.data?.error || 'Failed'); } finally { setLoading(false); }
+    } catch (err: any) {
+      toast(err.response?.data?.error || 'Failed', 'error');
+      setError(err.response?.data?.error || 'Failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -115,12 +147,14 @@ function MaintenanceForm({ onClose, onSuccess }: { onClose: () => void; onSucces
                 sublabel: `${v.registrationNumber} - ${v.status.replace('_', ' ')}`
               })) || []}
               value={form.vehicleId}
-              onChange={v => setForm(f => ({ ...f, vehicleId: v }))}
+              onChange={v => { setForm(f => ({ ...f, vehicleId: v })); setErrors(errs => errs.filter(e => e.field !== 'vehicleId')); }}
             />
+            {getFieldError(errors, 'vehicleId') && <p className="text-sm text-destructive">{getFieldError(errors, 'vehicleId')}</p>}
           </div>
           <div className="space-y-1 sm:col-span-2">
             <label className="text-sm font-medium">Service Description *</label>
-            <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} required placeholder="e.g., Oil Change & Filter Replacement" />
+            <Input className={getFieldError(errors, 'description') ? 'border-destructive' : ''} value={form.description} onChange={e => { setForm(f => ({ ...f, description: e.target.value })); setErrors(errs => errs.filter(e => e.field !== 'description')); }} required placeholder="e.g., Oil Change & Filter Replacement" />
+            {getFieldError(errors, 'description') && <p className="text-sm text-destructive">{getFieldError(errors, 'description')}</p>}
           </div>
           <div className="space-y-1">
             <SearchableSelect
@@ -142,7 +176,8 @@ function MaintenanceForm({ onClose, onSuccess }: { onClose: () => void; onSucces
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium">Cost ($) *</label>
-            <Input type="number" value={form.cost || ''} onChange={e => setForm(f => ({ ...f, cost: Number(e.target.value) }))} required min={0} />
+            <Input className={getFieldError(errors, 'cost') ? 'border-destructive' : ''} type="number" value={form.cost || ''} onChange={e => { setForm(f => ({ ...f, cost: Number(e.target.value) })); setErrors(errs => errs.filter(e => e.field !== 'cost')); }} required min={0} />
+            {getFieldError(errors, 'cost') && <p className="text-sm text-destructive">{getFieldError(errors, 'cost')}</p>}
           </div>
           <div className="space-y-1">
             <SearchableSelect
@@ -160,11 +195,13 @@ function MaintenanceForm({ onClose, onSuccess }: { onClose: () => void; onSucces
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium">Date *</label>
-            <Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} required />
+            <Input className={getFieldError(errors, 'date') ? 'border-destructive' : ''} type="date" value={form.date} onChange={e => { setForm(f => ({ ...f, date: e.target.value })); setErrors(errs => errs.filter(e => e.field !== 'date')); }} required />
+            {getFieldError(errors, 'date') && <p className="text-sm text-destructive">{getFieldError(errors, 'date')}</p>}
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium">Expected Completion</label>
-            <Input type="date" value={form.expectedCompletion} onChange={e => setForm(f => ({ ...f, expectedCompletion: e.target.value }))} />
+            <Input className={getFieldError(errors, 'expectedCompletion') ? 'border-destructive' : ''} type="date" value={form.expectedCompletion} onChange={e => { setForm(f => ({ ...f, expectedCompletion: e.target.value })); setErrors(errs => errs.filter(e => e.field !== 'expectedCompletion')); }} />
+            {getFieldError(errors, 'expectedCompletion') && <p className="text-sm text-destructive">{getFieldError(errors, 'expectedCompletion')}</p>}
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium">Vendor</label>

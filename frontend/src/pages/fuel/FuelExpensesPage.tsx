@@ -17,6 +17,7 @@ import { useToast } from '@/components/shared/Toast';
 import { useSearchParams } from 'react-router-dom';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
 import { usePermission } from '../../components/auth/PermissionGuard';
+import { validateRequired, validateNumber, validateDateString, type FieldError, getFieldError } from '../../utils/validation';
 
 export function FuelExpensesPage() {
   const [searchParams] = useSearchParams();
@@ -149,12 +150,41 @@ function FuelForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () =
   const [form, setForm] = useState({ vehicleId: '', liters: 0, cost: 0, date: new Date().toISOString().split('T')[0], driver: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<FieldError[]>([]);
+  const { toast } = useToast();
   const { data: vehicles } = useQuery({ queryKey: ['vehicles-all'], queryFn: async () => { const r = await api.get('/vehicles?limit=100'); return r.data.data as Vehicle[]; } });
+
+  function validate() {
+    const errs: FieldError[] = [];
+    const ve = validateRequired(form.vehicleId, 'Vehicle');
+    if (ve) errs.push({ field: 'vehicleId', message: ve });
+    const le = validateNumber(form.liters, 'Liters', 1);
+    if (le) errs.push({ field: 'liters', message: le });
+    const ce = validateNumber(form.cost, 'Cost', 1);
+    if (ce) errs.push({ field: 'cost', message: ce });
+    return errs;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(''); setLoading(true);
-    try { await api.post('/fuel-logs', form); onSuccess(); } catch (err: any) { setError(err.response?.data?.error || 'Failed'); } finally { setLoading(false); }
+    setError('');
+    const errs = validate();
+    setErrors(errs);
+    if (errs.length > 0) {
+      toast('Please fix errors', 'error');
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.post('/fuel-logs', form);
+      toast('Fuel log added', 'success');
+      onSuccess();
+    } catch (err: any) {
+      toast(err.response?.data?.error || 'Failed', 'error');
+      setError(err.response?.data?.error || 'Failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -167,12 +197,13 @@ function FuelForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () =
               label="Vehicle *"
               options={vehicles?.map(v => ({ value: v.id, label: v.name, sublabel: v.registrationNumber })) || []}
               value={form.vehicleId}
-              onChange={value => setForm(f => ({ ...f, vehicleId: value }))}
+              onChange={value => { setForm(f => ({ ...f, vehicleId: value })); setErrors(errs => errs.filter(e => e.field !== 'vehicleId')); }}
               placeholder="Select vehicle"
             />
+            {getFieldError(errors, 'vehicleId') && <p className="text-sm text-destructive">{getFieldError(errors, 'vehicleId')}</p>}
           </div>
-          <div className="space-y-1"><label className="text-sm font-medium">Liters *</label><Input type="number" step="0.1" value={form.liters || ''} onChange={e => setForm(f => ({ ...f, liters: Number(e.target.value) }))} required min={0} /></div>
-          <div className="space-y-1"><label className="text-sm font-medium">Cost ($) *</label><Input type="number" step="0.01" value={form.cost || ''} onChange={e => setForm(f => ({ ...f, cost: Number(e.target.value) }))} required min={0} /></div>
+          <div className="space-y-1"><label className="text-sm font-medium">Liters *</label><Input className={getFieldError(errors, 'liters') ? 'border-destructive' : ''} type="number" step="0.1" value={form.liters || ''} onChange={e => { setForm(f => ({ ...f, liters: Number(e.target.value) })); setErrors(errs => errs.filter(e => e.field !== 'liters')); }} required min={0} />{getFieldError(errors, 'liters') && <p className="text-sm text-destructive">{getFieldError(errors, 'liters')}</p>}</div>
+          <div className="space-y-1"><label className="text-sm font-medium">Cost ($) *</label><Input className={getFieldError(errors, 'cost') ? 'border-destructive' : ''} type="number" step="0.01" value={form.cost || ''} onChange={e => { setForm(f => ({ ...f, cost: Number(e.target.value) })); setErrors(errs => errs.filter(e => e.field !== 'cost')); }} required min={0} />{getFieldError(errors, 'cost') && <p className="text-sm text-destructive">{getFieldError(errors, 'cost')}</p>}</div>
           {form.liters > 0 && form.cost > 0 && (
             <div className="text-sm text-muted-foreground col-span-2">
               Price per liter: <strong>${(form.cost / form.liters).toFixed(2)}</strong>
@@ -192,6 +223,8 @@ function ExpenseForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   const [form, setForm] = useState({ vehicleId: '', type: 'TOLL', amount: 0, date: new Date().toISOString().split('T')[0], description: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<FieldError[]>([]);
+  const { toast } = useToast();
   const { data: vehicles } = useQuery({ queryKey: ['vehicles-all'], queryFn: async () => { const r = await api.get('/vehicles?limit=100'); return r.data.data as Vehicle[]; } });
 
   const expenseTypes = [
@@ -203,10 +236,39 @@ function ExpenseForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
     { value: 'FUEL', label: 'Fuel' },
   ];
 
+  function validate() {
+    const errs: FieldError[] = [];
+    const ve = validateRequired(form.vehicleId, 'Vehicle');
+    if (ve) errs.push({ field: 'vehicleId', message: ve });
+    const ae = validateNumber(form.amount, 'Amount', 1);
+    if (ae) errs.push({ field: 'amount', message: ae });
+    const te = validateRequired(form.type, 'Type');
+    if (te) errs.push({ field: 'type', message: te });
+    const dte = validateDateString(form.date, 'Date');
+    if (dte) errs.push({ field: 'date', message: dte });
+    return errs;
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(''); setLoading(true);
-    try { await api.post('/expenses', form); onSuccess(); } catch (err: any) { setError(err.response?.data?.error || 'Failed'); } finally { setLoading(false); }
+    setError('');
+    const errs = validate();
+    setErrors(errs);
+    if (errs.length > 0) {
+      toast('Please fix errors', 'error');
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.post('/expenses', form);
+      toast('Expense added', 'success');
+      onSuccess();
+    } catch (err: any) {
+      toast(err.response?.data?.error || 'Failed', 'error');
+      setError(err.response?.data?.error || 'Failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -219,21 +281,23 @@ function ExpenseForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
               label="Vehicle *"
               options={vehicles?.map(v => ({ value: v.id, label: v.name, sublabel: v.registrationNumber })) || []}
               value={form.vehicleId}
-              onChange={value => setForm(f => ({ ...f, vehicleId: value }))}
+              onChange={value => { setForm(f => ({ ...f, vehicleId: value })); setErrors(errs => errs.filter(e => e.field !== 'vehicleId')); }}
               placeholder="Select vehicle"
             />
+            {getFieldError(errors, 'vehicleId') && <p className="text-sm text-destructive">{getFieldError(errors, 'vehicleId')}</p>}
           </div>
           <div className="space-y-1">
             <SearchableSelect
               label="Type *"
               options={expenseTypes}
               value={form.type}
-              onChange={value => setForm(f => ({ ...f, type: value }))}
+              onChange={value => { setForm(f => ({ ...f, type: value })); setErrors(errs => errs.filter(e => e.field !== 'type')); }}
               placeholder="Select type"
             />
+            {getFieldError(errors, 'type') && <p className="text-sm text-destructive">{getFieldError(errors, 'type')}</p>}
           </div>
-          <div className="space-y-1"><label className="text-sm font-medium">Amount ($) *</label><Input type="number" step="0.01" value={form.amount || ''} onChange={e => setForm(f => ({ ...f, amount: Number(e.target.value) }))} required min={0} /></div>
-          <div className="space-y-1"><label className="text-sm font-medium">Date *</label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} required /></div>
+          <div className="space-y-1"><label className="text-sm font-medium">Amount ($) *</label><Input className={getFieldError(errors, 'amount') ? 'border-destructive' : ''} type="number" step="0.01" value={form.amount || ''} onChange={e => { setForm(f => ({ ...f, amount: Number(e.target.value) })); setErrors(errs => errs.filter(e => e.field !== 'amount')); }} required min={0} />{getFieldError(errors, 'amount') && <p className="text-sm text-destructive">{getFieldError(errors, 'amount')}</p>}</div>
+          <div className="space-y-1"><label className="text-sm font-medium">Date *</label><Input className={getFieldError(errors, 'date') ? 'border-destructive' : ''} type="date" value={form.date} onChange={e => { setForm(f => ({ ...f, date: e.target.value })); setErrors(errs => errs.filter(e => e.field !== 'date')); }} required />{getFieldError(errors, 'date') && <p className="text-sm text-destructive">{getFieldError(errors, 'date')}</p>}</div>
           <div className="space-y-1 sm:col-span-2"><label className="text-sm font-medium">Description</label><Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g., Highway toll" /></div>
           {error && <p className="text-sm text-destructive col-span-2">{error}</p>}
           <div className="flex gap-2 col-span-2"><Button type="submit" disabled={loading}>{loading ? <Spinner /> : 'Add Expense'}</Button><Button type="button" variant="outline" onClick={onClose}>Cancel</Button></div>

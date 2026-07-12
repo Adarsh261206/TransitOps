@@ -18,6 +18,7 @@ import { Plus, Search, Pencil, Trash2, Eye, ArrowLeft, Phone, Award, CalendarDay
 import { useToast } from '@/components/shared/Toast';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
 import { usePermission } from '../../components/auth/PermissionGuard';
+import { validateRequired, validateNumber, validateDateString, type FieldError } from '../../utils/validation';
 
 const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   AVAILABLE: 'default', ON_TRIP: 'secondary', OFF_DUTY: 'outline', SUSPENDED: 'destructive',
@@ -87,7 +88,7 @@ export function DriversPage() {
       </div>
 
       {showForm && (
-        <DriverForm driver={editing} onClose={() => { setShowForm(false); setEditing(null); }} onSuccess={() => { setShowForm(false); setEditing(null); queryClient.invalidateQueries({ queryKey: ['drivers'] }); toast(editing ? 'Driver updated' : 'Driver registered', 'success'); }} />
+        <DriverForm driver={editing} onClose={() => { setShowForm(false); setEditing(null); }} onSuccess={() => { setShowForm(false); setEditing(null); queryClient.invalidateQueries({ queryKey: ['drivers'] }); }} />
       )}
 
       <div className="flex flex-wrap gap-3 mb-6">
@@ -207,17 +208,54 @@ function DriverForm({ driver, onClose, onSuccess }: { driver: Driver | null; onC
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<FieldError[]>([]);
+  const { toast } = useToast();
+
+  const fe = (f: string) => errors.find(e => e.field === f)?.message;
+
+  const validate = (): FieldError[] => {
+    const errs: FieldError[] = [];
+    const add = (field: string, msg: string | null) => {
+      if (msg) errs.push({ field, message: msg });
+    };
+    add('name', validateRequired(form.name, 'Name'));
+    add('contactNumber', validateRequired(form.contactNumber, 'Contact Number'));
+    add('licenseNumber', validateRequired(form.licenseNumber, 'License Number'));
+    add('licenseCategory', validateRequired(form.licenseCategory, 'License Category'));
+    const expiryReq = validateRequired(form.licenseExpiryDate, 'License Expiry Date');
+    add('licenseExpiryDate', expiryReq);
+    if (!expiryReq) {
+      add('licenseExpiryDate', validateDateString(form.licenseExpiryDate, 'License Expiry Date'));
+    }
+    return errs;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    const validationErrors = validate();
+    setErrors(validationErrors);
+    if (validationErrors.length > 0) {
+      toast('Please fix errors', 'error');
+      return;
+    }
     setLoading(true);
     try {
       const { emergencyContact: ec, emergencyPhone: ep, ...rest } = form;
       const payload = { ...rest, ...(ec ? { emergencyContact: ec } : {}), ...(ep ? { emergencyPhone: ep } : {}) };
       driver ? await api.put(`/drivers/${driver.id}`, payload) : await api.post('/drivers', payload);
+      toast('Driver saved successfully', 'success');
       onSuccess();
-    } catch (err: any) { setError(err.response?.data?.error || 'Operation failed'); } finally { setLoading(false); }
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Operation failed';
+      toast(msg, 'error');
+      setError(msg);
+      if (err.response?.data?.details) {
+        setErrors(err.response.data.details.map((d: any) => ({ field: d.field, message: d.message })));
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const steps = [
@@ -254,35 +292,67 @@ function DriverForm({ driver, onClose, onSuccess }: { driver: Driver | null; onC
         <form onSubmit={handleSubmit}>
           {step === 1 && (
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1"><label className="text-sm font-medium">Full Name *</label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required /></div>
-              <div className="space-y-1"><label className="text-sm font-medium">Contact Number *</label><Input value={form.contactNumber} onChange={e => setForm(f => ({ ...f, contactNumber: e.target.value }))} required /></div>
-              <div className="space-y-1"><label className="text-sm font-medium">Safety Score (0-10)</label><Input type="number" step="0.1" min="0" max="10" value={form.safetyScore} onChange={e => setForm(f => ({ ...f, safetyScore: Number(e.target.value) }))} /></div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Full Name *</label>
+                <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required className={fe('name') ? 'border-destructive' : ''} />
+                {fe('name') && <p className="text-xs text-destructive">{fe('name')}</p>}
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Contact Number *</label>
+                <Input value={form.contactNumber} onChange={e => setForm(f => ({ ...f, contactNumber: e.target.value }))} required className={fe('contactNumber') ? 'border-destructive' : ''} />
+                {fe('contactNumber') && <p className="text-xs text-destructive">{fe('contactNumber')}</p>}
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Safety Score (0-10)</label>
+                <Input type="number" step="0.1" min="0" max="10" value={form.safetyScore} onChange={e => setForm(f => ({ ...f, safetyScore: Number(e.target.value) }))} className={fe('safetyScore') ? 'border-destructive' : ''} />
+                {fe('safetyScore') && <p className="text-xs text-destructive">{fe('safetyScore')}</p>}
+              </div>
             </div>
           )}
 
           {step === 2 && (
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1"><label className="text-sm font-medium">License Number *</label><Input value={form.licenseNumber} onChange={e => setForm(f => ({ ...f, licenseNumber: e.target.value }))} required /></div>
-              <div className="space-y-1"><label className="text-sm font-medium">License Category *</label>
-                <SearchableSelect
-                  options={[
-                    { value: 'LMV', label: 'LMV' },
-                    { value: 'HMV', label: 'HMV' },
-                    { value: 'Trailer', label: 'Trailer' },
-                    { value: 'Transport', label: 'Transport' },
-                  ]}
-                  value={form.licenseCategory}
-                  onChange={v => setForm(f => ({ ...f, licenseCategory: v }))}
-                />
+              <div className="space-y-1">
+                <label className="text-sm font-medium">License Number *</label>
+                <Input value={form.licenseNumber} onChange={e => setForm(f => ({ ...f, licenseNumber: e.target.value }))} required className={fe('licenseNumber') ? 'border-destructive' : ''} />
+                {fe('licenseNumber') && <p className="text-xs text-destructive">{fe('licenseNumber')}</p>}
               </div>
-              <div className="space-y-1"><label className="text-sm font-medium">License Expiry Date *</label><Input type="date" value={form.licenseExpiryDate} onChange={e => setForm(f => ({ ...f, licenseExpiryDate: e.target.value }))} required /></div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">License Category *</label>
+                <div className={fe('licenseCategory') ? 'border-destructive' : ''}>
+                  <SearchableSelect
+                    options={[
+                      { value: 'LMV', label: 'LMV' },
+                      { value: 'HMV', label: 'HMV' },
+                      { value: 'Trailer', label: 'Trailer' },
+                      { value: 'Transport', label: 'Transport' },
+                    ]}
+                    value={form.licenseCategory}
+                    onChange={v => setForm(f => ({ ...f, licenseCategory: v }))}
+                  />
+                </div>
+                {fe('licenseCategory') && <p className="text-xs text-destructive">{fe('licenseCategory')}</p>}
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">License Expiry Date *</label>
+                <Input type="date" value={form.licenseExpiryDate} onChange={e => setForm(f => ({ ...f, licenseExpiryDate: e.target.value }))} required className={fe('licenseExpiryDate') ? 'border-destructive' : ''} />
+                {fe('licenseExpiryDate') && <p className="text-xs text-destructive">{fe('licenseExpiryDate')}</p>}
+              </div>
             </div>
           )}
 
           {step === 3 && (
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1"><label className="text-sm font-medium">Emergency Contact Name</label><Input value={form.emergencyContact} onChange={e => setForm(f => ({ ...f, emergencyContact: e.target.value }))} /></div>
-              <div className="space-y-1"><label className="text-sm font-medium">Emergency Phone</label><Input value={form.emergencyPhone} onChange={e => setForm(f => ({ ...f, emergencyPhone: e.target.value }))} /></div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Emergency Contact Name</label>
+                <Input value={form.emergencyContact} onChange={e => setForm(f => ({ ...f, emergencyContact: e.target.value }))} className={fe('emergencyContact') ? 'border-destructive' : ''} />
+                {fe('emergencyContact') && <p className="text-xs text-destructive">{fe('emergencyContact')}</p>}
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Emergency Phone</label>
+                <Input value={form.emergencyPhone} onChange={e => setForm(f => ({ ...f, emergencyPhone: e.target.value }))} className={fe('emergencyPhone') ? 'border-destructive' : ''} />
+                {fe('emergencyPhone') && <p className="text-xs text-destructive">{fe('emergencyPhone')}</p>}
+              </div>
             </div>
           )}
 

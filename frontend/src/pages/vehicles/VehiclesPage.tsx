@@ -21,6 +21,7 @@ import { Plus, Search, Pencil, Trash2, Eye, ArrowLeft, Gauge, Weight, DollarSign
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '@/components/shared/Toast';
 import { usePermission } from '../../components/auth/PermissionGuard';
+import { validateRequired, validateNumber, validateDateString, getFieldError, type FieldError } from '../../utils/validation';
 
 const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   AVAILABLE: 'default', ON_TRIP: 'secondary', IN_SHOP: 'destructive', RETIRED: 'outline',
@@ -297,18 +298,51 @@ function VehicleForm({ vehicle, onClose, onSuccess }: { vehicle: Vehicle | null;
     insuranceExpiry: vehicle?.insuranceExpiry || '',
     pucExpiry: vehicle?.pucExpiry || '',
   });
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState<FieldError[]>([]);
   const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const validate = (): FieldError[] => {
+    const e: FieldError[] = [];
+    const req = (v: any, n: string) => { const r = validateRequired(v, n); if (r) e.push({ field: n.toLowerCase().replace(/\s/g, '_'), message: r }); };
+    req(form.registrationNumber, 'Registration Number');
+    req(form.name, 'Name');
+    if (!form.type || form.type === '') e.push({ field: 'type', message: 'Type is required' });
+    const cap = validateNumber(form.maxLoadCapacity, 'Max Load Capacity', 1);
+    if (cap) e.push({ field: 'maxLoadCapacity', message: cap });
+    const dt1 = validateDateString(form.acquisitionDate, 'Acquisition Date');
+    if (dt1) e.push({ field: 'acquisitionDate', message: dt1 });
+    const dt2 = validateDateString(form.insuranceExpiry, 'Insurance Expiry');
+    if (dt2) e.push({ field: 'insuranceExpiry', message: dt2 });
+    const dt3 = validateDateString(form.pucExpiry, 'PUC Expiry');
+    if (dt3) e.push({ field: 'pucExpiry', message: dt3 });
+    return e;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setErrors([]);
+    const validationErrors = validate();
+    if (validationErrors.length > 0) {
+      setErrors(validationErrors);
+      toast('Please fix the highlighted errors', 'error');
+      return;
+    }
     setLoading(true);
     try {
-      vehicle ? await api.put(`/vehicles/${vehicle.id}`, form) : await api.post('/vehicles', form);
+      const payload = { ...form };
+      ['acquisitionDate', 'insuranceExpiry', 'pucExpiry'].forEach(k => { if (!(payload as any)[k]) delete (payload as any)[k]; });
+      vehicle ? await api.put(`/vehicles/${vehicle.id}`, payload) : await api.post('/vehicles', payload);
+      toast(vehicle ? 'Vehicle updated successfully' : 'Vehicle registered successfully', 'success');
       onSuccess();
-    } catch (err: any) { setError(err.response?.data?.error || 'Operation failed'); } finally { setLoading(false); }
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Operation failed. Please check your input.';
+      toast(msg, 'error');
+      setErrors(err.response?.data?.details?.map((d: any) => ({ field: d.path?.[0] || '', message: d.message })) || []);
+    } finally { setLoading(false); }
   };
+
+  const fe = (f: string) => errors.find(e => e.field === f)?.message;
 
   return (
     <Card className="mb-6 border-primary/20">
@@ -316,27 +350,52 @@ function VehicleForm({ vehicle, onClose, onSuccess }: { vehicle: Vehicle | null;
         <h3 className="font-semibold mb-1">{vehicle ? 'Edit Vehicle' : 'Register New Vehicle'}</h3>
         <p className="text-xs text-muted-foreground mb-4">Fill in the vehicle details. Registration number must be unique across the fleet.</p>
         <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="space-y-1"><label className="text-sm font-medium">Registration Number *</label><Input value={form.registrationNumber} onChange={e => setForm(f => ({ ...f, registrationNumber: e.target.value }))} required placeholder="e.g., TRK-001" /></div>
-          <div className="space-y-1"><label className="text-sm font-medium">Vehicle Name *</label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="e.g., Volvo FH16" /></div>
-          <div className="space-y-1"><label className="text-sm font-medium">Type *</label>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Registration Number *</label>
+            <Input value={form.registrationNumber} onChange={e => setForm(f => ({ ...f, registrationNumber: e.target.value }))} required placeholder="e.g., TRK-001" className={fe('registration_number') ? 'border-destructive' : ''} />
+            {fe('registration_number') && <p className="text-xs text-destructive">{fe('registration_number')}</p>}
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Vehicle Name *</label>
+            <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="e.g., Volvo FH16" className={fe('name') ? 'border-destructive' : ''} />
+            {fe('name') && <p className="text-xs text-destructive">{fe('name')}</p>}
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Type *</label>
             <SearchableSelect options={vehicleTypeOptions} value={form.type} onChange={v => setForm(f => ({ ...f, type: v }))} placeholder="Select type" />
+            {fe('type') && <p className="text-xs text-destructive">{fe('type')}</p>}
           </div>
           <div className="space-y-1"><label className="text-sm font-medium">Manufacturer</label><Input value={form.manufacturer} onChange={e => setForm(f => ({ ...f, manufacturer: e.target.value }))} placeholder="e.g., Volvo" /></div>
           <div className="space-y-1"><label className="text-sm font-medium">Model</label><Input value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} placeholder="e.g., FH16" /></div>
-          <div className="space-y-1"><label className="text-sm font-medium">Max Load Capacity (kg) *</label><Input type="number" value={form.maxLoadCapacity || ''} onChange={e => setForm(f => ({ ...f, maxLoadCapacity: Number(e.target.value) }))} required min={1} /></div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Max Load Capacity (kg) *</label>
+            <Input type="number" value={form.maxLoadCapacity || ''} onChange={e => setForm(f => ({ ...f, maxLoadCapacity: Number(e.target.value) }))} required min={1} className={fe('maxLoadCapacity') ? 'border-destructive' : ''} />
+            {fe('maxLoadCapacity') && <p className="text-xs text-destructive">{fe('maxLoadCapacity')}</p>}
+          </div>
           <div className="space-y-1"><label className="text-sm font-medium">Odometer (km)</label><Input type="number" value={form.odometer || ''} onChange={e => setForm(f => ({ ...f, odometer: Number(e.target.value) }))} min={0} /></div>
           <div className="space-y-1"><label className="text-sm font-medium">Acquisition Cost ($)</label><Input type="number" value={form.acquisitionCost || ''} onChange={e => setForm(f => ({ ...f, acquisitionCost: Number(e.target.value) }))} min={0} /></div>
-          <div className="space-y-1"><label className="text-sm font-medium">Acquisition Date</label><Input type="date" value={form.acquisitionDate} onChange={e => setForm(f => ({ ...f, acquisitionDate: e.target.value }))} /></div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Acquisition Date</label>
+            <Input type="date" value={form.acquisitionDate} onChange={e => setForm(f => ({ ...f, acquisitionDate: e.target.value }))} className={fe('acquisitionDate') ? 'border-destructive' : ''} />
+            {fe('acquisitionDate') && <p className="text-xs text-destructive">{fe('acquisitionDate')}</p>}
+          </div>
           <div className="space-y-1"><label className="text-sm font-medium">Fuel Type</label>
             <SearchableSelect options={fuelTypeOptions} value={form.fuelType} onChange={v => setForm(f => ({ ...f, fuelType: v }))} placeholder="Select fuel type" />
           </div>
           <div className="space-y-1"><label className="text-sm font-medium">Owner</label>
             <SearchableSelect options={ownerOptions} value={form.owner} onChange={v => setForm(f => ({ ...f, owner: v }))} placeholder="Select owner" />
           </div>
-          <div className="space-y-1"><label className="text-sm font-medium">Insurance Expiry</label><Input type="date" value={form.insuranceExpiry} onChange={e => setForm(f => ({ ...f, insuranceExpiry: e.target.value }))} /></div>
-          <div className="space-y-1"><label className="text-sm font-medium">PUC Expiry</label><Input type="date" value={form.pucExpiry} onChange={e => setForm(f => ({ ...f, pucExpiry: e.target.value }))} /></div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Insurance Expiry</label>
+            <Input type="date" value={form.insuranceExpiry} onChange={e => setForm(f => ({ ...f, insuranceExpiry: e.target.value }))} className={fe('insuranceExpiry') ? 'border-destructive' : ''} />
+            {fe('insuranceExpiry') && <p className="text-xs text-destructive">{fe('insuranceExpiry')}</p>}
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">PUC Expiry</label>
+            <Input type="date" value={form.pucExpiry} onChange={e => setForm(f => ({ ...f, pucExpiry: e.target.value }))} className={fe('pucExpiry') ? 'border-destructive' : ''} />
+            {fe('pucExpiry') && <p className="text-xs text-destructive">{fe('pucExpiry')}</p>}
+          </div>
           <div className="space-y-1 sm:col-span-2 lg:col-span-3"><label className="text-sm font-medium">Region</label><Input value={form.region} onChange={e => setForm(f => ({ ...f, region: e.target.value }))} placeholder="e.g., North, South" /></div>
-          {error && <p className="text-sm text-destructive col-span-full">{error}</p>}
           <div className="flex gap-2 col-span-full"><Button type="submit" disabled={loading}>{loading ? <Spinner /> : vehicle ? 'Update Vehicle' : 'Register Vehicle'}</Button><Button type="button" variant="outline" onClick={onClose}>Cancel</Button></div>
         </form>
       </CardContent>
