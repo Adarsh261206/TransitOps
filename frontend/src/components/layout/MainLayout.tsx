@@ -1,10 +1,14 @@
 import { Outlet, Navigate } from 'react-router-dom';
+import { useState } from 'react';
 import { Sidebar } from './Sidebar';
+import { TopNavbar } from './TopNavbar';
 import { useAuth } from '@/hooks/useAuth';
 import { Spinner } from '@/components/ui/spinner';
+import { cn } from '@/lib/utils';
 
 export function MainLayout() {
   const { user, loading } = useAuth();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   if (loading) {
     return (
@@ -20,12 +24,15 @@ export function MainLayout() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <main className="flex-1 pl-64 transition-all duration-300">
-        <div className="mx-auto max-w-7xl p-6">
-          <Outlet />
-        </div>
-      </main>
+      <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+      <div className={cn("flex flex-1 flex-col transition-all duration-300", sidebarCollapsed ? "ml-16" : "ml-64")}>
+        <TopNavbar onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)} />
+        <main className="flex-1">
+          <div className="mx-auto max-w-7xl p-6">
+            <Outlet />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

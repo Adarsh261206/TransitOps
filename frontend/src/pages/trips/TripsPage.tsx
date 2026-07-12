@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import type { Trip, Vehicle, Driver } from '@/types';
-import { PageHeader } from '@/components/shared/PageHeader';
+import { Breadcrumbs } from '@/components/shared/Breadcrumbs';
 import { PageTransition } from '@/components/shared/PageTransition';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { TableSkeleton } from '@/components/shared/Skeletons';
@@ -13,60 +13,62 @@ import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { motion } from 'framer-motion';
-import { Plus, Route, ArrowRight, Send, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Route, ArrowRight, Send, CheckCircle, XCircle, ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react';
+import { useToast } from '@/components/shared/Toast';
+import { useSearchParams } from 'react-router-dom';
 
 const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  DRAFT: 'outline',
-  DISPATCHED: 'secondary',
-  COMPLETED: 'default',
-  CANCELLED: 'destructive',
+  DRAFT: 'outline', DISPATCHED: 'secondary', COMPLETED: 'default', CANCELLED: 'destructive',
 };
 
 export function TripsPage() {
-  const [showForm, setShowForm] = useState(false);
-  const [statusFilter, setStatusFilter] = useState('');
+  const [searchParams] = useSearchParams();
+  const [showWizard, setShowWizard] = useState(searchParams.get('action') === 'create');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data, isLoading } = useQuery({
     queryKey: ['trips', statusFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (statusFilter) params.append('status', statusFilter);
-      params.append('limit', '100');
+      params.append('limit', '50');
       const res = await api.get(`/trips?${params}`);
       return res.data as { data: Trip[] };
     },
   });
 
-  const dispatchMutation = useMutation({
-    mutationFn: (id: string) => api.patch(`/trips/${id}/status`, { status: 'DISPATCHED' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['trips'] }),
-  });
-
-  const completeMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => api.patch(`/trips/${id}/status`, { status: 'COMPLETED', ...data }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['trips'] }); setSelectedTrip(null); },
-  });
-
-  const cancelMutation = useMutation({
-    mutationFn: (id: string) => api.patch(`/trips/${id}/status`, { status: 'CANCELLED' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['trips'] }),
+  const mutateStatus = useMutation({
+    mutationFn: ({ id, status, data: extra }: { id: string; status: string; data?: any }) =>
+      api.patch(`/trips/${id}/status`, { status, ...extra }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['trips'] });
+      toast(`Trip ${res.data.status.toLowerCase()} successfully`, 'success');
+      setSelectedTrip(null);
+    },
+    onError: (err: any) => toast(err.response?.data?.error || 'Operation failed', 'error'),
   });
 
   const trips = data?.data || [];
+  const activeTrips = trips.filter(t => t.status === 'DISPATCHED');
+  const draftTrips = trips.filter(t => t.status === 'DRAFT');
+  const completedTrips = trips.filter(t => t.status === 'COMPLETED');
+  const cancelledTrips = trips.filter(t => t.status === 'CANCELLED');
 
   return (
     <PageTransition>
-      <PageHeader
-        title="Trip Management"
-        description="Create, dispatch, complete, and monitor all trips with full validation and automatic status updates."
-        action={<Button onClick={() => setShowForm(true)}><Plus className="h-4 w-4 mr-2" /> New Trip</Button>}
-      />
+      <Breadcrumbs />
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Trips</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Create, dispatch, complete, and monitor all trips with full validation.</p>
+        </div>
+        <Button onClick={() => setShowWizard(true)}><Plus className="h-4 w-4 mr-2" /> Create Trip</Button>
+      </div>
 
-      {showForm && (
-        <TripForm onClose={() => setShowForm(false)} onSuccess={() => { setShowForm(false); queryClient.invalidateQueries({ queryKey: ['trips'] }); }} />
-      )}
+      {showWizard && <TripWizard onClose={() => setShowWizard(false)} onSuccess={() => { setShowWizard(false); queryClient.invalidateQueries({ queryKey: ['trips'] }); toast('Trip created! Dispatch it from the list.', 'success'); }} />}
 
       <div className="flex flex-wrap gap-3 mb-6">
         <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="w-40">
@@ -78,12 +80,26 @@ export function TripsPage() {
         </Select>
       </div>
 
-      {isLoading ? (
-        <TableSkeleton rows={5} cols={6} />
-      ) : trips.length === 0 ? (
-        <EmptyState title="No trips found" description="Create your first trip to begin operations." action={<Button onClick={() => setShowForm(true)}><Plus className="h-4 w-4 mr-2" /> Create Trip</Button>} />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+        {[
+          { label: 'Draft', count: draftTrips.length, color: 'text-gray-600', bg: 'bg-gray-100 dark:bg-gray-800' },
+          { label: 'Active', count: activeTrips.length, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/20' },
+          { label: 'Completed', count: completedTrips.length, color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/20' },
+          { label: 'Cancelled', count: cancelledTrips.length, color: 'text-red-600', bg: 'bg-red-100 dark:bg-red-900/20' },
+        ].map((item, i) => (
+          <Card key={item.label} className="cursor-pointer hover:shadow-md transition-all" onClick={() => setStatusFilter(item.label.toUpperCase())}>
+            <CardContent className="p-4 flex items-center justify-between">
+              <span className="text-sm font-medium">{item.label}</span>
+              <span className={`text-xl font-bold ${item.color}`}>{item.count}</span>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {isLoading ? <TableSkeleton rows={5} cols={5} /> : trips.length === 0 ? (
+        <EmptyState title="No trips found" description="Create your first trip to begin operations." action={<Button onClick={() => setShowWizard(true)}><Plus className="h-4 w-4 mr-2" /> Create Trip</Button>} />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {trips.map((trip, i) => (
             <motion.div key={trip.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02 }}>
               <Card className="hover:shadow-md transition-all">
@@ -98,15 +114,14 @@ export function TripsPage() {
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                         <span>{trip.vehicle?.name} ({trip.vehicle?.registrationNumber})</span>
                         <span>{trip.driver?.name}</span>
-                        <span>{trip.cargoWeight} kg</span>
-                        <span>{trip.plannedDistance} km planned</span>
+                        <span>{trip.cargoWeight} kg · {trip.plannedDistance} km</span>
                         {trip.revenue && <span>${trip.revenue}</span>}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Badge variant={statusColors[trip.status]}>{trip.status}</Badge>
                       {trip.status === 'DRAFT' && (
-                        <Button size="sm" variant="outline" onClick={() => dispatchMutation.mutate(trip.id)}>
+                        <Button size="sm" variant="outline" onClick={() => mutateStatus.mutate({ id: trip.id, status: 'DISPATCHED' })}>
                           <Send className="h-3 w-3 mr-1" /> Dispatch
                         </Button>
                       )}
@@ -115,7 +130,7 @@ export function TripsPage() {
                           <Button size="sm" variant="default" onClick={() => setSelectedTrip(trip)}>
                             <CheckCircle className="h-3 w-3 mr-1" /> Complete
                           </Button>
-                          <Button size="sm" variant="destructive" onClick={() => cancelMutation.mutate(trip.id)}>
+                          <Button size="sm" variant="destructive" onClick={() => mutateStatus.mutate({ id: trip.id, status: 'CANCELLED' })}>
                             <XCircle className="h-3 w-3 mr-1" /> Cancel
                           </Button>
                         </>
@@ -130,101 +145,96 @@ export function TripsPage() {
       )}
 
       {selectedTrip && selectedTrip.status === 'DISPATCHED' && (
-        <CompleteTripDialog
-          trip={selectedTrip}
-          onSubmit={(data) => completeMutation.mutate({ id: selectedTrip.id, data })}
-          onClose={() => setSelectedTrip(null)}
-          loading={completeMutation.isPending}
-        />
+        <CompleteTripDialog trip={selectedTrip} onSubmit={(data) => mutateStatus.mutate({ id: selectedTrip.id, status: 'COMPLETED', data })} onClose={() => setSelectedTrip(null)} loading={mutateStatus.isPending} />
       )}
+
+      <div className="mt-6 rounded-xl border bg-card p-4">
+        <h3 className="text-sm font-semibold mb-2">📋 Business Rules</h3>
+        <ul className="text-xs text-muted-foreground space-y-1">
+          <li>• Cargo weight must not exceed vehicle's max load capacity.</li>
+          <li>• Only Available vehicles and drivers can be assigned.</li>
+          <li>• Dispatching a trip changes vehicle & driver status to On Trip.</li>
+          <li>• Completing a trip restores both to Available. Cancelling also restores.</li>
+        </ul>
+      </div>
     </PageTransition>
   );
 }
 
-function TripForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [form, setForm] = useState({
-    source: '', destination: '', vehicleId: '', driverId: '',
-    cargoWeight: 0, plannedDistance: 0, revenue: 0,
-  });
+function TripWizard({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [step, setStep] = useState(0);
+  const [form, setForm] = useState({ source: '', destination: '', vehicleId: '', driverId: '', cargoWeight: 0, plannedDistance: 0, revenue: 0 });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { data: vehicles } = useQuery({
-    queryKey: ['vehicles-available'],
-    queryFn: async () => { const res = await api.get('/vehicles?status=AVAILABLE&limit=100'); return res.data.data as Vehicle[]; },
-  });
+  const { data: vehicles } = useQuery({ queryKey: ['vehicles-available'], queryFn: async () => { const r = await api.get('/vehicles?status=AVAILABLE&limit=100'); return r.data.data as Vehicle[]; } });
+  const { data: drivers } = useQuery({ queryKey: ['drivers-available'], queryFn: async () => { const r = await api.get('/drivers?status=AVAILABLE'); return r.data as Driver[]; } });
 
-  const { data: drivers } = useQuery({
-    queryKey: ['drivers-available'],
-    queryFn: async () => { const res = await api.get('/drivers?status=AVAILABLE'); return res.data as Driver[]; },
-  });
+  const steps = [
+    { title: 'Source', field: 'source', placeholder: 'e.g., Warehouse A - NYC', type: 'text' },
+    { title: 'Destination', field: 'destination', placeholder: 'e.g., Distribution Center - Boston', type: 'text' },
+    { title: 'Vehicle', field: 'vehicleId', type: 'select', options: vehicles?.map(v => ({ value: v.id, label: `${v.name} (${v.registrationNumber}) - ${v.maxLoadCapacity}kg max` })) || [] },
+    { title: 'Driver', field: 'driverId', type: 'select', options: drivers?.map(d => ({ value: d.id, label: `${d.name} (${d.licenseNumber})` })) || [] },
+    { title: 'Cargo Weight', field: 'cargoWeight', placeholder: 'Weight in kg', type: 'number' },
+    { title: 'Distance', field: 'plannedDistance', placeholder: 'Distance in km', type: 'number' },
+  ];
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleNext = () => {
+    if (step < steps.length - 1) setStep(s => s + 1);
+    else handleSubmit();
+  };
+
+  const handleSubmit = async () => {
     setError('');
     setLoading(true);
     try {
       await api.post('/trips', form);
       onSuccess();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create trip');
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { setError(err.response?.data?.error || 'Failed to create trip'); } finally { setLoading(false); }
   };
+
+  const current = steps[step];
 
   return (
     <Card className="mb-6 border-primary/20">
-      <CardContent className="p-5">
-        <h3 className="font-semibold mb-4">Create New Trip</h3>
-        <p className="text-xs text-muted-foreground mb-4">
-          Select an available vehicle and driver. The system will validate cargo weight against vehicle capacity and driver license validity.
-        </p>
-        <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Source *</label>
-            <Input value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))} required placeholder="e.g., Warehouse A - NYC" />
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Destination *</label>
-            <Input value={form.destination} onChange={e => setForm(f => ({ ...f, destination: e.target.value }))} required />
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Vehicle *</label>
-            <Select value={form.vehicleId} onChange={e => setForm(f => ({ ...f, vehicleId: e.target.value }))} required>
-              <option value="">Select vehicle</option>
-              {vehicles?.map(v => (
-                <option key={v.id} value={v.id}>{v.name} ({v.registrationNumber}) - {v.maxLoadCapacity}kg max</option>
-              ))}
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="font-semibold flex items-center gap-2"><ClipboardList className="h-4 w-4" /> Trip Creation Wizard</h3>
+          <span className="text-xs text-muted-foreground">Step {step + 1} of {steps.length}</span>
+        </div>
+
+        <div className="flex gap-1 mb-6">
+          {steps.map((_, i) => (
+            <div key={i} className={`flex-1 h-1.5 rounded-full transition-colors ${i <= step ? 'bg-primary' : 'bg-muted'}`} />
+          ))}
+        </div>
+
+        <div className="mb-6">
+          <h4 className="text-sm font-medium mb-3">{current.title}</h4>
+          {current.type === 'select' ? (
+            <Select value={form[current.field as keyof typeof form] as string} onChange={e => setForm(f => ({ ...f, [current.field]: e.target.value }))} className="w-full" required>
+              <option value="">Select {current.title}</option>
+              {current.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </Select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Driver *</label>
-            <Select value={form.driverId} onChange={e => setForm(f => ({ ...f, driverId: e.target.value }))} required>
-              <option value="">Select driver</option>
-              {drivers?.map(d => (
-                <option key={d.id} value={d.id}>{d.name} ({d.licenseNumber})</option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Cargo Weight (kg) *</label>
-            <Input type="number" value={form.cargoWeight || ''} onChange={e => setForm(f => ({ ...f, cargoWeight: Number(e.target.value) }))} required min={1} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Planned Distance (km) *</label>
-            <Input type="number" value={form.plannedDistance || ''} onChange={e => setForm(f => ({ ...f, plannedDistance: Number(e.target.value) }))} required min={1} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Revenue ($)</label>
-            <Input type="number" value={form.revenue || ''} onChange={e => setForm(f => ({ ...f, revenue: Number(e.target.value) }))} min={0} />
-          </div>
-          {error && <p className="text-sm text-destructive sm:col-span-2">{error}</p>}
-          <div className="flex gap-2 sm:col-span-2">
-            <Button type="submit" disabled={loading}>{loading ? <Spinner /> : 'Create Trip'}</Button>
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          </div>
-        </form>
+          ) : (
+            <Input type={current.type} placeholder={current.placeholder} value={(form[current.field as keyof typeof form] as number || '') as any} onChange={e => setForm(f => ({ ...f, [current.field]: current.type === 'number' ? Number(e.target.value) : e.target.value }))} required min={0} />
+          )}
+        </div>
+
+        <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground mb-4">
+          <strong>Review:</strong> {form.source || '?'} → {form.destination || '?'} · Vehicle: {form.vehicleId ? vehicles?.find(v => v.id === form.vehicleId)?.name : '?'} · Driver: {form.driverId ? drivers?.find(d => d.id === form.driverId)?.name : '?'} · {form.cargoWeight || '?'}kg · {form.plannedDistance || '?'}km
+        </div>
+
+        {error && <p className="text-sm text-destructive mb-4">{error}</p>}
+
+        <div className="flex justify-between">
+          <Button variant="outline" onClick={step === 0 ? onClose : () => setStep(s => s - 1)} disabled={loading}>
+            {step === 0 ? 'Cancel' : <><ChevronLeft className="h-4 w-4 mr-1" /> Back</>}
+          </Button>
+          <Button onClick={handleNext} disabled={loading}>
+            {loading ? <Spinner /> : step < steps.length - 1 ? <><>Next</> <ChevronRight className="h-4 w-4 ml-1" /></> : 'Create & Dispatch'}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
@@ -236,34 +246,15 @@ function CompleteTripDialog({ trip, onSubmit, onClose, loading }: { trip: Trip; 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <Card className="w-full max-w-md mx-4">
-        <CardHeader>
-          <CardTitle>Complete Trip</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Complete Trip</CardTitle></CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            Trip from {trip.source} to {trip.destination}. Enter completion details.
-          </p>
+          <p className="text-sm text-muted-foreground mb-4">{trip.source} → {trip.destination}. Enter completion details.</p>
           <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="space-y-3">
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Actual Distance (km) *</label>
-              <Input type="number" value={form.actualDistance || ''} onChange={e => setForm(f => ({ ...f, actualDistance: Number(e.target.value) }))} required min={1} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Fuel Consumed (liters) *</label>
-              <Input type="number" step="0.1" value={form.fuelConsumed || ''} onChange={e => setForm(f => ({ ...f, fuelConsumed: Number(e.target.value) }))} required min={0} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Final Odometer (km) *</label>
-              <Input type="number" value={form.finalOdometer || ''} onChange={e => setForm(f => ({ ...f, finalOdometer: Number(e.target.value) }))} required min={0} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Revenue ($)</label>
-              <Input type="number" value={form.revenue || ''} onChange={e => setForm(f => ({ ...f, revenue: Number(e.target.value) }))} min={0} />
-            </div>
-            <div className="flex gap-2 pt-2">
-              <Button type="submit" disabled={loading}>{loading ? <Spinner /> : 'Complete Trip'}</Button>
-              <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            </div>
+            <div className="space-y-1"><label className="text-sm font-medium">Actual Distance (km)</label><Input type="number" value={form.actualDistance || ''} onChange={e => setForm(f => ({ ...f, actualDistance: Number(e.target.value) }))} required min={1} /></div>
+            <div className="space-y-1"><label className="text-sm font-medium">Fuel Consumed (L)</label><Input type="number" step="0.1" value={form.fuelConsumed || ''} onChange={e => setForm(f => ({ ...f, fuelConsumed: Number(e.target.value) }))} required min={0} /></div>
+            <div className="space-y-1"><label className="text-sm font-medium">Final Odometer (km)</label><Input type="number" value={form.finalOdometer || ''} onChange={e => setForm(f => ({ ...f, finalOdometer: Number(e.target.value) }))} required min={0} /></div>
+            <div className="space-y-1"><label className="text-sm font-medium">Revenue ($)</label><Input type="number" value={form.revenue || ''} onChange={e => setForm(f => ({ ...f, revenue: Number(e.target.value) }))} min={0} /></div>
+            <div className="flex gap-2 pt-2"><Button type="submit" disabled={loading}>{loading ? <Spinner /> : 'Complete Trip'}</Button><Button type="button" variant="outline" onClick={onClose}>Cancel</Button></div>
           </form>
         </CardContent>
       </Card>

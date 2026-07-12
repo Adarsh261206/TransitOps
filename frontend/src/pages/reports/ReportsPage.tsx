@@ -1,243 +1,182 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '@/services/api';
-import { PageHeader } from '@/components/shared/PageHeader';
+import { Breadcrumbs } from '@/components/shared/Breadcrumbs';
 import { PageTransition } from '@/components/shared/PageTransition';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import { TableSkeleton } from '@/components/shared/Skeletons';
 import { motion } from 'framer-motion';
-import { BarChart3, Download, TrendingUp, DollarSign, Fuel, Gauge, PieChart } from 'lucide-react';
+import { BarChart3, Download, TrendingUp, DollarSign, Fuel, Gauge, PieChart, Truck, ArrowUpDown } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RPieChart, Pie, Cell, LineChart, Line } from 'recharts';
+
+const COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
 export function ReportsPage() {
-  const { data: summary } = useQuery({
-    queryKey: ['reports-summary'],
-    queryFn: async () => { const res = await api.get('/reports/summary'); return res.data; },
-  });
+  const { data: summary } = useQuery({ queryKey: ['reports-summary'], queryFn: async () => { const r = await api.get('/reports/summary'); return r.data; } });
+  const { data: utilization } = useQuery({ queryKey: ['reports-utilization'], queryFn: async () => { const r = await api.get('/reports/fleet-utilization'); return r.data; } });
+  const { data: fuelEfficiency } = useQuery({ queryKey: ['reports-fuel-efficiency'], queryFn: async () => { const r = await api.get('/reports/fuel-efficiency'); return r.data; } });
+  const { data: operationalCost } = useQuery({ queryKey: ['reports-operational-cost'], queryFn: async () => { const r = await api.get('/reports/operational-cost'); return r.data; } });
+  const { data: roi } = useQuery({ queryKey: ['reports-roi'], queryFn: async () => { const r = await api.get('/reports/vehicle-roi'); return r.data; } });
 
-  const { data: utilization } = useQuery({
-    queryKey: ['reports-utilization'],
-    queryFn: async () => { const res = await api.get('/reports/fleet-utilization'); return res.data; },
-  });
-
-  const { data: fuelEfficiency } = useQuery({
-    queryKey: ['reports-fuel-efficiency'],
-    queryFn: async () => { const res = await api.get('/reports/fuel-efficiency'); return res.data; },
-  });
-
-  const { data: operationalCost } = useQuery({
-    queryKey: ['reports-operational-cost'],
-    queryFn: async () => { const res = await api.get('/reports/operational-cost'); return res.data; },
-  });
-
-  const { data: roi } = useQuery({
-    queryKey: ['reports-roi'],
-    queryFn: async () => { const res = await api.get('/reports/vehicle-roi'); return res.data; },
-  });
-
-  const handleExport = async () => {
+  const handleExport = async (format: 'csv' | 'pdf') => {
     try {
       const res = await api.get('/reports/summary');
       const data = res.data;
-      const csv = Object.entries(data).map(([key, val]) => `${key},${val}`).join('\n');
+      const csv = Object.entries(data).map(([k, v]) => `${k},${v}`).join('\n');
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'transitops-report.csv';
-      a.click();
+      const a = document.createElement('a'); a.href = url; a.download = `transitops-report.${format}`; a.click();
       URL.revokeObjectURL(url);
     } catch {}
   };
 
+  const pieData = utilization ? [
+    { name: 'On Trip', value: utilization.onTrip },
+    { name: 'Available', value: utilization.available },
+    { name: 'In Shop', value: utilization.inShop },
+    { name: 'Retired', value: utilization.retired },
+  ].filter(d => d.value > 0) : [];
+
+  const costData = operationalCost?.map((v: any) => ({ name: v.vehicleName, Fuel: v.fuelCost, Maintenance: v.maintenanceCost })) || [];
+  const roiData = roi?.map((v: any) => ({ name: v.vehicleName, roi: v.roi })) || [];
+  const efficiencyData = fuelEfficiency?.map((v: any) => ({ name: v.vehicleName, efficiency: parseFloat(v.efficiency) })) || [];
+
   return (
     <PageTransition>
-      <PageHeader
-        title="Reports & Analytics"
-        description="Operational insights, cost analysis, and fleet performance metrics."
-        action={
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-2" /> Export CSV
-          </Button>
-        }
-      />
+      <Breadcrumbs />
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Operational insights, cost analysis, and fleet performance metrics.</p>
+        </div>
+        <div className="flex gap-2">
+          <Select className="w-32"><option value="">This Month</option><option value="7d">Last 7 Days</option><option value="30d">Last 30 Days</option><option value="90d">Last Quarter</option></Select>
+          <Button variant="outline" onClick={() => handleExport('csv')}><Download className="h-4 w-4 mr-2" /> CSV</Button>
+        </div>
+      </div>
 
-      <div className="grid gap-6 mb-8 lg:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+        {[
+          { label: 'Fuel Efficiency', value: summary ? `${(summary.totalFuelLiters > 0 ? (summary.totalTrips * 100 / summary.totalFuelLiters) : 0).toFixed(1)} km/L` : '-', icon: Fuel, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/20' },
+          { label: 'Fleet Utilization', value: `${utilization?.utilizationRate ?? 0}%`, icon: PieChart, color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/20' },
+          { label: 'Operational Cost', value: summary ? `$${(summary.totalOperationalCost ?? 0).toLocaleString()}` : '-', icon: DollarSign, color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/20' },
+          { label: 'Vehicle ROI', value: roi?.length ? `${roi.reduce((s: number, v: any) => s + v.roi, 0) / roi.length}%` : '-', icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/20' },
+        ].map((kpi, i) => (
+          <motion.div key={kpi.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+            <Card><CardContent className="p-4 flex items-center gap-3">
+              <div className={`rounded-lg p-2.5 ${kpi.bg}`}><kpi.icon className={`h-5 w-5 ${kpi.color}`} /></div>
+              <div><p className="text-xs text-muted-foreground">{kpi.label}</p><p className="text-lg font-bold">{kpi.value}</p></div>
+            </CardContent></Card>
+          </motion.div>
+        ))}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2 mb-8">
         <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">Operational Summary</CardTitle>
-            </div>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-sm font-medium flex items-center gap-2"><PieChart className="h-4 w-4" /> Fleet Utilization</CardTitle></CardHeader>
           <CardContent>
-            {summary ? (
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  { label: 'Total Trips', value: summary.totalTrips, icon: TrendingUp },
-                  { label: 'Completed Trips', value: summary.completedTrips, icon: TrendingUp },
-                  { label: 'Total Fuel Cost', value: `$${summary.totalFuelCost?.toLocaleString()}`, icon: Fuel },
-                  { label: 'Total Maintenance', value: `$${summary.totalMaintenanceCost?.toLocaleString()}`, icon: DollarSign },
-                  { label: 'Other Expenses', value: `$${summary.totalOtherExpenses?.toLocaleString()}`, icon: DollarSign },
-                  { label: 'Total Operational', value: `$${summary.totalOperationalCost?.toLocaleString()}`, icon: DollarSign },
-                  { label: 'Total Fuel (L)', value: `${summary.totalFuelLiters?.toFixed(0)} L`, icon: Fuel },
-                  { label: 'Total Vehicles', value: summary.totalVehicles, icon: Gauge },
-                ].map((item, i) => (
-                  <motion.div key={item.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
-                    className="rounded-lg bg-muted/50 p-3"
-                  >
-                    <p className="text-xs text-muted-foreground">{item.label}</p>
-                    <p className="text-lg font-bold mt-1">{item.value}</p>
-                  </motion.div>
-                ))}
+            {pieData.length > 0 ? (
+              <div className="flex flex-col items-center">
+                <div className="h-64 w-full">
+                  <ResponsiveContainer><RPieChart>
+                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={2} dataKey="value">
+                      {pieData.map((_, i) => <Cell key={i} fill={COLORS[i]} />)}
+                    </Pie>
+                    <Tooltip />
+                  </RPieChart></ResponsiveContainer>
+                </div>
+                <div className="flex flex-wrap justify-center gap-4 mt-2">
+                  {pieData.map((d, i) => (
+                    <div key={d.name} className="flex items-center gap-1.5 text-xs"><div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLORS[i] }} />{d.name} ({d.value})</div>
+                  ))}
+                </div>
               </div>
-            ) : <TableSkeleton rows={4} cols={2} />}
+            ) : <p className="text-sm text-muted-foreground py-8 text-center">No data</p>}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <PieChart className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">Fleet Utilization</CardTitle>
-            </div>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-sm font-medium flex items-center gap-2"><DollarSign className="h-4 w-4" /> Vehicle Operational Cost</CardTitle></CardHeader>
           <CardContent>
-            {utilization ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between rounded-lg bg-muted/50 p-4">
-                  <span className="text-sm font-medium">Overall Utilization Rate</span>
-                  <span className="text-2xl font-bold text-primary">{utilization.utilizationRate}%</span>
-                </div>
-                {[
-                  { label: 'On Trip', value: utilization.onTrip, total: utilization.total, color: 'bg-blue-500' },
-                  { label: 'Available', value: utilization.available, total: utilization.total, color: 'bg-green-500' },
-                  { label: 'In Shop', value: utilization.inShop, total: utilization.total, color: 'bg-amber-500' },
-                  { label: 'Retired', value: utilization.retired, total: utilization.total, color: 'bg-gray-500' },
-                ].map((item) => (
-                  <div key={item.label}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>{item.label}</span>
-                      <span className="font-medium">{item.value} / {item.total}</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-muted overflow-hidden">
-                      <div className={`h-full rounded-full transition-all ${item.color}`} style={{ width: `${(item.value / Math.max(item.total, 1)) * 100}%` }} />
-                    </div>
-                  </div>
-                ))}
+            {costData.length > 0 ? (
+              <div className="h-64">
+                <ResponsiveContainer><BarChart data={costData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="Fuel" fill="#3b82f6" radius={[2, 2, 0, 0]} stackId="a" />
+                  <Bar dataKey="Maintenance" fill="#f59e0b" radius={[2, 2, 0, 0]} stackId="a" />
+                </BarChart></ResponsiveContainer>
               </div>
-            ) : <TableSkeleton rows={5} cols={2} />}
+            ) : <p className="text-sm text-muted-foreground py-8 text-center">No cost data</p>}
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-6 mb-8 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2 mb-8">
         <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">Operational Cost per Vehicle</CardTitle>
-            </div>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-sm font-medium flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Vehicle ROI</CardTitle></CardHeader>
           <CardContent>
-            {operationalCost && operationalCost.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-muted-foreground">
-                      <th className="pb-2 font-medium">Vehicle</th>
-                      <th className="pb-2 font-medium">Fuel</th>
-                      <th className="pb-2 font-medium">Maintenance</th>
-                      <th className="pb-2 font-medium">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {operationalCost.map((item: any, i: number) => (
-                      <tr key={item.vehicleId} className="border-b last:border-0">
-                        <td className="py-2 font-medium">{item.vehicleName}</td>
-                        <td className="py-2">${item.fuelCost.toLocaleString()}</td>
-                        <td className="py-2">${item.maintenanceCost.toLocaleString()}</td>
-                        <td className="py-2 font-semibold">${item.totalOperationalCost.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {roiData.length > 0 ? (
+              <div className="h-64">
+                <ResponsiveContainer><BarChart data={roiData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="roi" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart></ResponsiveContainer>
               </div>
-            ) : <p className="text-sm text-muted-foreground py-4 text-center">No cost data available</p>}
+            ) : <p className="text-sm text-muted-foreground py-8 text-center">No ROI data</p>}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">Vehicle ROI</CardTitle>
-            </div>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-sm font-medium flex items-center gap-2"><Fuel className="h-4 w-4" /> Fuel Efficiency (km/L)</CardTitle></CardHeader>
           <CardContent>
-            {roi && roi.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-muted-foreground">
-                      <th className="pb-2 font-medium">Vehicle</th>
-                      <th className="pb-2 font-medium">Revenue</th>
-                      <th className="pb-2 font-medium">Cost</th>
-                      <th className="pb-2 font-medium">ROI</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {roi.map((item: any, i: number) => (
-                      <tr key={item.vehicleId} className="border-b last:border-0">
-                        <td className="py-2 font-medium">{item.vehicleName}</td>
-                        <td className="py-2">${item.totalRevenue.toLocaleString()}</td>
-                        <td className="py-2">${item.operationalCost.toLocaleString()}</td>
-                        <td className="py-2">
-                          <span className={`font-semibold ${item.roi >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {item.roi.toFixed(1)}%
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {efficiencyData.length > 0 ? (
+              <div className="h-64">
+                <ResponsiveContainer><BarChart data={efficiencyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="efficiency" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                </BarChart></ResponsiveContainer>
               </div>
-            ) : <p className="text-sm text-muted-foreground py-4 text-center">No ROI data available yet. Complete some trips first.</p>}
+            ) : <p className="text-sm text-muted-foreground py-8 text-center">No efficiency data</p>}
           </CardContent>
         </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <Fuel className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">Fuel Efficiency (km/L)</CardTitle>
-          </div>
+          <CardTitle className="text-sm font-medium flex items-center gap-2"><Truck className="h-4 w-4" /> Top Costliest Vehicles</CardTitle>
         </CardHeader>
         <CardContent>
-          {fuelEfficiency && fuelEfficiency.length > 0 ? (
+          {roi?.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-2 font-medium">Vehicle</th>
-                    <th className="pb-2 font-medium">Total Distance</th>
-                    <th className="pb-2 font-medium">Total Fuel</th>
-                    <th className="pb-2 font-medium">Efficiency (km/L)</th>
-                  </tr>
-                </thead>
+                <thead><tr className="border-b text-left text-muted-foreground">
+                  <th className="pb-2 font-medium">Vehicle</th><th className="pb-2 font-medium">Revenue</th><th className="pb-2 font-medium">Fuel Cost</th><th className="pb-2 font-medium">Maintenance</th><th className="pb-2 font-medium">Acquisition</th><th className="pb-2 font-medium">ROI</th>
+                </tr></thead>
                 <tbody>
-                  {fuelEfficiency.map((item: any, i: number) => (
-                    <tr key={item.vehicleId} className="border-b last:border-0">
-                      <td className="py-2 font-medium">{item.vehicleName} ({item.registrationNumber})</td>
-                      <td className="py-2">{item.totalDistance.toLocaleString()} km</td>
-                      <td className="py-2">{item.totalFuel.toFixed(1)} L</td>
-                      <td className="py-2 font-semibold">{item.efficiency} km/L</td>
+                  {[...roi].sort((a: any, b: any) => a.roi - b.roi).slice(0, 10).map((v: any) => (
+                    <tr key={v.vehicleId} className="border-b last:border-0 hover:bg-muted/50">
+                      <td className="py-2 font-medium">{v.vehicleName}</td>
+                      <td className="py-2">${v.totalRevenue.toLocaleString()}</td>
+                      <td className="py-2">${v.totalFuelCost.toLocaleString()}</td>
+                      <td className="py-2">${v.totalMaintenanceCost.toLocaleString()}</td>
+                      <td className="py-2">${v.acquisitionCost.toLocaleString()}</td>
+                      <td className="py-2"><span className={`font-semibold ${v.roi >= 0 ? 'text-green-600' : 'text-red-600'}`}>{v.roi.toFixed(1)}%</span></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          ) : <p className="text-sm text-muted-foreground py-4 text-center">No fuel efficiency data available yet. Complete trips to generate data.</p>}
+          ) : <p className="text-sm text-muted-foreground py-4 text-center">Complete trips to generate ROI data</p>}
         </CardContent>
       </Card>
     </PageTransition>

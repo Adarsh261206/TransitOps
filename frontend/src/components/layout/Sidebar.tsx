@@ -1,30 +1,23 @@
 import { NavLink } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { 
-  LayoutDashboard, Truck, Users, Route, Wrench, Fuel, Receipt, 
-  BarChart3, ChevronLeft, Moon, Sun, LogOut, Menu 
+  LayoutDashboard, Truck, Users, Route, Wrench, Fuel, 
+  BarChart3, Settings, ChevronLeft
 } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/ui/button';
-import { useState } from 'react';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/vehicles', icon: Truck, label: 'Vehicles' },
+  { to: '/vehicles', icon: Truck, label: 'Fleet / Vehicle Registry' },
   { to: '/drivers', icon: Users, label: 'Drivers' },
   { to: '/trips', icon: Route, label: 'Trips' },
   { to: '/maintenance', icon: Wrench, label: 'Maintenance' },
-  { to: '/fuel', icon: Fuel, label: 'Fuel Logs' },
-  { to: '/expenses', icon: Receipt, label: 'Expenses' },
-  { to: '/reports', icon: BarChart3, label: 'Reports' },
+  { to: '/fuel-expenses', icon: Fuel, label: 'Fuel & Expenses' },
+  { to: '/reports', icon: BarChart3, label: 'Analytics' },
+  { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
-export function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
-  const { user, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
-
+export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   return (
     <aside className={cn(
       "fixed left-0 top-0 z-40 flex h-screen flex-col border-r bg-sidebar text-sidebar-foreground transition-all duration-300",
@@ -32,19 +25,19 @@ export function Sidebar() {
     )}>
       <div className="flex h-14 items-center gap-2 border-b px-4">
         {!collapsed && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">
               TO
             </div>
-            <span className="text-lg font-bold tracking-tight">TransitOps</span>
+            <span className="text-base font-bold tracking-tight">TransitOps</span>
           </div>
         )}
-        <Button variant="ghost" size="icon" onClick={() => setCollapsed(!collapsed)} className={cn("ml-auto", collapsed && "mx-auto")}>
+        <Button variant="ghost" size="icon" onClick={onToggle} className={cn("h-7 w-7", collapsed && "mx-auto")}>
           <ChevronLeft className={cn("h-4 w-4 transition-transform", collapsed && "rotate-180")} />
         </Button>
       </div>
 
-      <nav className="flex-1 space-y-1 p-2 overflow-y-auto">
+      <nav className="flex-1 space-y-0.5 p-2 overflow-y-auto">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
@@ -63,21 +56,13 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="border-t p-2 space-y-1">
-        {!collapsed && user && (
+      <div className="border-t p-2">
+        {!collapsed && (
           <div className="px-3 py-2 text-xs text-muted-foreground">
-            <div className="font-medium text-foreground">{user.name}</div>
-            <div>{user.role.replace('_', ' ')}</div>
+            <div className="font-medium text-foreground">TransitOps v1.0</div>
+            <div>© 2026 TransitOps</div>
           </div>
         )}
-        <div className="flex gap-1">
-          <Button variant="ghost" size="icon" onClick={toggleTheme} className={collapsed ? "mx-auto" : ""}>
-            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
-          <Button variant="ghost" size="icon" onClick={logout} className={collapsed ? "mx-auto" : ""}>
-            <LogOut className="h-4 w-4" />
-          </Button>
-        </div>
       </div>
     </aside>
   );
