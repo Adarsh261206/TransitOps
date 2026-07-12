@@ -59,7 +59,9 @@ export type Permission = typeof Permissions[keyof typeof Permissions];
 
 const RolePermissionMap: Record<string, Permission[]> = {
   DRIVER: [
-    Permissions.TRIPS_READ, Permissions.FLEET_READ,
+    Permissions.TRIPS_READ, Permissions.TRIPS_CREATE, Permissions.TRIPS_DISPATCH, Permissions.TRIPS_COMPLETE, Permissions.TRIPS_CANCEL,
+    Permissions.DRIVERS_READ,
+    Permissions.FLEET_READ,
     Permissions.SETTINGS_READ,
   ],
   FLEET_MANAGER: [
@@ -120,7 +122,8 @@ export const getSidebarItems = (role: string | undefined): SidebarItem[] => {
   const items: Record<string, SidebarItem[]> = {
     DRIVER: [
       { label: 'Dashboard', path: '/dashboard', icon: 'LayoutDashboard' },
-      { label: 'My Trips', path: '/trips', icon: 'Route', permission: Permissions.TRIPS_READ },
+      { label: 'Trips', path: '/trips', icon: 'Route', permission: Permissions.TRIPS_READ },
+      { label: 'Drivers', path: '/drivers', icon: 'Users', permission: Permissions.DRIVERS_READ },
       { label: 'Vehicles', path: '/vehicles', icon: 'Truck', permission: Permissions.FLEET_READ },
       { label: 'Settings', path: '/settings', icon: 'Settings', permission: Permissions.SETTINGS_READ },
     ],
@@ -170,7 +173,8 @@ export interface QuickAction {
 export const getQuickActions = (role: string | undefined): QuickAction[] => {
   const actions: Record<string, QuickAction[]> = {
     DRIVER: [
-      { label: 'View My Trips', path: '/trips', icon: 'Route', permission: Permissions.TRIPS_READ },
+      { label: 'Create Trip', path: '/trips?action=create', icon: 'PlusCircle', permission: Permissions.TRIPS_CREATE },
+      { label: 'View Trips', path: '/trips', icon: 'Route', permission: Permissions.TRIPS_READ },
     ],
     FLEET_MANAGER: [
       { label: 'Add Vehicle', path: '/vehicles?action=create', icon: 'PlusCircle', permission: Permissions.FLEET_CREATE },
