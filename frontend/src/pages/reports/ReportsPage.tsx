@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '@/services/api';
+import { usePermission } from '../../components/auth/PermissionGuard';
 import { Breadcrumbs } from '@/components/shared/Breadcrumbs';
 import { PageTransition } from '@/components/shared/PageTransition';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +14,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 const COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
 export function ReportsPage() {
+  const { can } = usePermission();
   const { data: summary } = useQuery({ queryKey: ['reports-summary'], queryFn: async () => { const r = await api.get('/reports/summary'); return r.data; } });
   const { data: utilization } = useQuery({ queryKey: ['reports-utilization'], queryFn: async () => { const r = await api.get('/reports/fleet-utilization'); return r.data; } });
   const { data: fuelEfficiency } = useQuery({ queryKey: ['reports-fuel-efficiency'], queryFn: async () => { const r = await api.get('/reports/fuel-efficiency'); return r.data; } });
@@ -52,7 +54,8 @@ export function ReportsPage() {
         </div>
         <div className="flex gap-2">
           <Select className="w-32"><option value="">This Month</option><option value="7d">Last 7 Days</option><option value="30d">Last 30 Days</option><option value="90d">Last Quarter</option></Select>
-          <Button variant="outline" onClick={() => handleExport('csv')}><Download className="h-4 w-4 mr-2" /> CSV</Button>
+          {can('reports:export:csv') && <Button variant="outline" onClick={() => handleExport('csv')}><Download className="h-4 w-4 mr-2" /> CSV</Button>}
+          {can('reports:export:pdf') && <Button variant="outline" onClick={() => handleExport('pdf')}><Download className="h-4 w-4 mr-2" /> PDF</Button>}
         </div>
       </div>
 

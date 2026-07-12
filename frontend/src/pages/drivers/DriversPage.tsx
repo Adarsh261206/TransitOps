@@ -17,6 +17,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Plus, Search, Pencil, Trash2, Eye, ArrowLeft, Phone, Award, CalendarDays, IdCard, AlertTriangle, Route, ChevronRight } from 'lucide-react';
 import { useToast } from '@/components/shared/Toast';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
+import { usePermission } from '../../components/auth/PermissionGuard';
 
 const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   AVAILABLE: 'default', ON_TRIP: 'secondary', OFF_DUTY: 'outline', SUSPENDED: 'destructive',
@@ -31,6 +32,7 @@ export function DriversPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { can } = usePermission();
 
   const { data: drivers, isLoading } = useQuery({
     queryKey: ['drivers', search, statusFilter],
@@ -67,8 +69,8 @@ export function DriversPage() {
     { key: 'actions', header: 'Actions', render: (d: Driver) => (
       <div className="flex gap-1" onClick={e => e.stopPropagation()}>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedDriver(d)}><Eye className="h-3.5 w-3.5" /></Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(d); setShowForm(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteConfirm(d.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+        {can('drivers:edit') && <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(d); setShowForm(true); }}><Pencil className="h-3.5 w-3.5" /></Button>}
+        {can('drivers:delete') && <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteConfirm(d.id)}><Trash2 className="h-3.5 w-3.5" /></Button>}
       </div>
     )},
   ];
@@ -81,7 +83,7 @@ export function DriversPage() {
           <h1 className="text-2xl font-bold tracking-tight">Drivers</h1>
           <p className="mt-1 text-sm text-muted-foreground">Manage driver profiles, license validity, safety scores, and compliance status.</p>
         </div>
-        <Button onClick={() => { setEditing(null); setShowForm(true); }}><Plus className="h-4 w-4 mr-2" /> Add Driver</Button>
+        {can('drivers:create') && <Button onClick={() => { setEditing(null); setShowForm(true); }}><Plus className="h-4 w-4 mr-2" /> Add Driver</Button>}
       </div>
 
       {showForm && (
@@ -103,7 +105,7 @@ export function DriversPage() {
       </div>
 
       {isLoading ? <TableSkeleton rows={5} cols={8} /> : !drivers?.length ? (
-        <EmptyState title="No drivers registered" description="Add your first driver to get started." action={<Button onClick={() => setShowForm(true)}><Plus className="h-4 w-4 mr-2" /> Add Driver</Button>} />
+        <EmptyState title="No drivers registered" description="Add your first driver to get started."         action={can('drivers:create') ? <Button onClick={() => setShowForm(true)}><Plus className="h-4 w-4 mr-2" /> Add Driver</Button> : undefined} />
       ) : (
         <DataTable columns={columns} data={drivers} onRowClick={(d) => setSelectedDriver(d)} />
       )}

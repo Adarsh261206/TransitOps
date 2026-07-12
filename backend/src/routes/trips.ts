@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import { getTrips, getTrip, createTrip, updateTripStatus, deleteTrip } from '../controllers/tripController.js';
-import { authenticate, authorize } from '../middleware/auth.js';
+import { authenticate, requirePermission } from '../middleware/auth.js';
 
 const router = Router();
 router.use(authenticate);
 
-router.get('/', getTrips);
-router.get('/:id', getTrip);
-router.post('/', authorize('FLEET_MANAGER', 'DRIVER'), createTrip);
-router.patch('/:id/status', authorize('FLEET_MANAGER', 'DRIVER'), updateTripStatus);
-router.delete('/:id', authorize('FLEET_MANAGER'), deleteTrip);
+router.get('/', requirePermission('trips:read'), getTrips);
+router.get('/:id', requirePermission('trips:read'), getTrip);
+router.post('/', requirePermission('trips:create'), createTrip);
+router.patch('/:id/status', requirePermission('trips:dispatch'), updateTripStatus);
+router.delete('/:id', requirePermission('trips:cancel'), deleteTrip);
 
 export default router;

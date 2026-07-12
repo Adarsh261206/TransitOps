@@ -17,6 +17,7 @@ import { Plus, Route, ArrowRight, Send, CheckCircle, XCircle, ChevronLeft, Chevr
 import { useToast } from '@/components/shared/Toast';
 import { useSearchParams } from 'react-router-dom';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
+import { usePermission } from '../../components/auth/PermissionGuard';
 
 const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   DRAFT: 'outline', DISPATCHED: 'secondary', COMPLETED: 'default', CANCELLED: 'destructive',
@@ -29,6 +30,7 @@ export function TripsPage() {
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { can } = usePermission();
 
   const { data, isLoading } = useQuery({
     queryKey: ['trips', statusFilter],
@@ -66,7 +68,7 @@ export function TripsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Trips</h1>
           <p className="mt-1 text-sm text-muted-foreground">Create, dispatch, complete, and monitor all trips with full validation.</p>
         </div>
-        <Button onClick={() => setShowWizard(true)}><Plus className="h-4 w-4 mr-2" /> Create Trip</Button>
+        {can('trips:create') && <Button onClick={() => setShowWizard(true)}><Plus className="h-4 w-4 mr-2" /> Create Trip</Button>}
       </div>
 
       {showWizard && <TripWizard onClose={() => setShowWizard(false)} onSuccess={() => { setShowWizard(false); queryClient.invalidateQueries({ queryKey: ['trips'] }); toast('Trip created! Dispatch it from the list.', 'success'); }} />}
@@ -98,7 +100,7 @@ export function TripsPage() {
       </div>
 
       {isLoading ? <TableSkeleton rows={5} cols={5} /> : trips.length === 0 ? (
-        <EmptyState title="No trips found" description="Create your first trip to begin operations." action={<Button onClick={() => setShowWizard(true)}><Plus className="h-4 w-4 mr-2" /> Create Trip</Button>} />
+        <EmptyState title="No trips found" description="Create your first trip to begin operations."         action={can('trips:create') ? <Button onClick={() => setShowWizard(true)}><Plus className="h-4 w-4 mr-2" /> Create Trip</Button> : undefined} />
       ) : (
         <div className="space-y-2">
           {trips.map((trip, i) => (
@@ -121,19 +123,19 @@ export function TripsPage() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Badge variant={statusColors[trip.status]}>{trip.status}</Badge>
-                      {trip.status === 'DRAFT' && (
+                      {trip.status === 'DRAFT' && can('trips:dispatch') && (
                         <Button size="sm" variant="outline" onClick={() => mutateStatus.mutate({ id: trip.id, status: 'DISPATCHED' })}>
                           <Send className="h-3 w-3 mr-1" /> Dispatch
                         </Button>
                       )}
                       {trip.status === 'DISPATCHED' && (
                         <>
-                          <Button size="sm" variant="default" onClick={() => setSelectedTrip(trip)}>
+                          {can('trips:complete') && <Button size="sm" variant="default" onClick={() => setSelectedTrip(trip)}>
                             <CheckCircle className="h-3 w-3 mr-1" /> Complete
-                          </Button>
-                          <Button size="sm" variant="destructive" onClick={() => mutateStatus.mutate({ id: trip.id, status: 'CANCELLED' })}>
+                          </Button>}
+                          {can('trips:cancel') && <Button size="sm" variant="destructive" onClick={() => mutateStatus.mutate({ id: trip.id, status: 'CANCELLED' })}>
                             <XCircle className="h-3 w-3 mr-1" /> Cancel
-                          </Button>
+                          </Button>}
                         </>
                       )}
                     </div>

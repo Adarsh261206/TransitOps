@@ -1,23 +1,22 @@
 import { NavLink } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { 
-  LayoutDashboard, Truck, Users, Route, Wrench, Fuel, 
-  BarChart3, Settings, ChevronLeft
+import {
+  LayoutDashboard, Truck, Users, Route, Wrench, Fuel,
+  BarChart3, Settings, ChevronLeft, Receipt, TrendingUp, Shield
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getSidebarItems } from '@/utils/permissions';
+import { useAuth } from '@/hooks/useAuth';
 
-const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/vehicles', icon: Truck, label: 'Fleet / Vehicle Registry' },
-  { to: '/drivers', icon: Users, label: 'Drivers' },
-  { to: '/trips', icon: Route, label: 'Trips' },
-  { to: '/maintenance', icon: Wrench, label: 'Maintenance' },
-  { to: '/fuel-expenses', icon: Fuel, label: 'Fuel & Expenses' },
-  { to: '/reports', icon: BarChart3, label: 'Analytics' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
-];
+const iconMap: Record<string, any> = {
+  LayoutDashboard, Truck, Users, Route, Wrench, Fuel,
+  BarChart3, Settings, Receipt, TrendingUp, Shield,
+};
 
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+  const { user } = useAuth();
+  const navItems = getSidebarItems(user?.role);
+
   return (
     <aside className={cn(
       "fixed left-0 top-0 z-40 flex h-screen flex-col border-r bg-sidebar text-sidebar-foreground transition-all duration-300",
@@ -38,22 +37,25 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
       </div>
 
       <nav className="flex-1 space-y-0.5 p-2 overflow-y-auto">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) => cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              isActive 
-                ? "bg-sidebar-primary text-sidebar-primary-foreground" 
-                : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              collapsed && "justify-center px-2"
-            )}
-          >
-            <item.icon className="h-4 w-4 shrink-0" />
-            {!collapsed && <span>{item.label}</span>}
-          </NavLink>
-        ))}
+        {navItems.map((item) => {
+          const Icon = iconMap[item.icon];
+          return (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) => cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                collapsed && "justify-center px-2"
+              )}
+            >
+              {Icon && <Icon className="h-4 w-4 shrink-0" />}
+              {!collapsed && <span>{item.label}</span>}
+            </NavLink>
+          );
+        })}
       </nav>
 
       <div className="border-t p-2">

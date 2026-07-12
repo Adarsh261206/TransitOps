@@ -20,6 +20,7 @@ import { motion } from 'framer-motion';
 import { Plus, Search, Pencil, Trash2, Eye, ArrowLeft, Gauge, Weight, DollarSign, MapPin, Calendar, Fuel, Wrench, Receipt, Route, User, AlertTriangle } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '@/components/shared/Toast';
+import { usePermission } from '../../components/auth/PermissionGuard';
 
 const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   AVAILABLE: 'default', ON_TRIP: 'secondary', IN_SHOP: 'destructive', RETIRED: 'outline',
@@ -66,6 +67,7 @@ export function VehiclesPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { can } = usePermission();
 
   const { data, isLoading } = useQuery({
     queryKey: ['vehicles', search, statusFilter, typeFilter, page],
@@ -104,8 +106,8 @@ export function VehiclesPage() {
     { key: 'actions', header: 'Actions', render: (v: Vehicle) => (
       <div className="flex gap-1" onClick={e => e.stopPropagation()}>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedVehicle(v)}><Eye className="h-3.5 w-3.5" /></Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(v); setShowForm(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteConfirm(v.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+        {can('fleet:edit') && <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(v); setShowForm(true); }}><Pencil className="h-3.5 w-3.5" /></Button>}
+        {can('fleet:delete') && <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteConfirm(v.id)}><Trash2 className="h-3.5 w-3.5" /></Button>}
       </div>
     ) },
   ];
@@ -118,9 +120,9 @@ export function VehiclesPage() {
           <h1 className="text-2xl font-bold tracking-tight">Fleet / Vehicle Registry</h1>
           <p className="mt-1 text-sm text-muted-foreground">Manage your fleet vehicles, track status, and view complete lifecycle history.</p>
         </div>
-        <Button onClick={() => { setEditing(null); setShowForm(true); }}>
+        {can('fleet:create') && <Button onClick={() => { setEditing(null); setShowForm(true); }}>
           <Plus className="h-4 w-4 mr-2" /> Add Vehicle
-        </Button>
+        </Button>}
       </div>
 
       {showForm && (
@@ -148,7 +150,7 @@ export function VehiclesPage() {
       </div>
 
       {isLoading ? <TableSkeleton rows={5} cols={8} /> : vehicles.length === 0 ? (
-        <EmptyState title="No vehicles registered" description="Add your first vehicle to start managing your fleet." action={<Button onClick={() => setShowForm(true)}><Plus className="h-4 w-4 mr-2" /> Add Vehicle</Button>} />
+        <EmptyState title="No vehicles registered" description="Add your first vehicle to start managing your fleet."         action={can('fleet:create') ? <Button onClick={() => setShowForm(true)}><Plus className="h-4 w-4 mr-2" /> Add Vehicle</Button> : undefined} />
       ) : (
         <>
           <DataTable columns={columns} data={vehicles} onRowClick={(v) => setSelectedVehicle(v)} />

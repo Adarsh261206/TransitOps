@@ -16,11 +16,13 @@ import { motion } from 'framer-motion';
 import { Plus, Wrench, CheckCircle, Building2 } from 'lucide-react';
 import { useToast } from '@/components/shared/Toast';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
+import { usePermission } from '../../components/auth/PermissionGuard';
 
 export function MaintenancePage() {
   const [showForm, setShowForm] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { can } = usePermission();
 
   const { data, isLoading } = useQuery({
     queryKey: ['maintenance'],
@@ -46,7 +48,7 @@ export function MaintenancePage() {
     { key: 'status', header: 'Status', render: (l: MaintenanceLog) => (
       <div className="flex items-center gap-2">
         <Badge variant={l.status === 'ACTIVE' ? 'destructive' : 'default'}>{l.status}</Badge>
-        {l.status === 'ACTIVE' && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => closeMutation.mutate(l.id)}><CheckCircle className="h-3 w-3 mr-1" /> Close</Button>}
+        {l.status === 'ACTIVE' && can('maintenance:close') && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => closeMutation.mutate(l.id)}><CheckCircle className="h-3 w-3 mr-1" /> Close</Button>}
       </div>
     )},
   ];
@@ -59,13 +61,13 @@ export function MaintenancePage() {
           <h1 className="text-2xl font-bold tracking-tight">Maintenance</h1>
           <p className="mt-1 text-sm text-muted-foreground">Track vehicle maintenance. Active records automatically set vehicles to 'In Shop'.</p>
         </div>
-        <Button onClick={() => setShowForm(true)}><Plus className="h-4 w-4 mr-2" /> Log Maintenance</Button>
+        {can('maintenance:create') && <Button onClick={() => setShowForm(true)}><Plus className="h-4 w-4 mr-2" /> Log Maintenance</Button>}
       </div>
 
       {showForm && <MaintenanceForm onClose={() => setShowForm(false)} onSuccess={() => { setShowForm(false); queryClient.invalidateQueries({ queryKey: ['maintenance'] }); toast('Maintenance logged. Vehicle set to In Shop.', 'success'); }} />}
 
       {isLoading ? <TableSkeleton rows={5} cols={6} /> : logs.length === 0 ? (
-        <EmptyState title="No maintenance records" description="Log your first maintenance record." action={<Button onClick={() => setShowForm(true)}><Plus className="h-4 w-4 mr-2" /> Log Maintenance</Button>} />
+        <EmptyState title="No maintenance records" description="Log your first maintenance record."         action={can('maintenance:create') ? <Button onClick={() => setShowForm(true)}><Plus className="h-4 w-4 mr-2" /> Log Maintenance</Button> : undefined} />
       ) : <DataTable columns={columns} data={logs} />}
 
       <div className="mt-6 rounded-xl border bg-card p-4">

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../index.js';
+import { hasPermission } from '../utils/permissions.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'transitops-super-secret-key-2026';
 
@@ -35,6 +36,18 @@ export function authorize(...roles: string[]) {
     }
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    next();
+  };
+}
+
+export function requirePermission(permission: string) {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    if (!hasPermission(req.user.role, permission)) {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to perform this action' });
     }
     next();
   };

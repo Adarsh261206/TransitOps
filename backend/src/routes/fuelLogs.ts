@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import { getFuelLogs, getFuelLog, createFuelLog, updateFuelLog, deleteFuelLog } from '../controllers/fuelLogController.js';
-import { authenticate, authorize } from '../middleware/auth.js';
+import { authenticate, requirePermission } from '../middleware/auth.js';
 
 const router = Router();
 router.use(authenticate);
 
-router.get('/', getFuelLogs);
-router.get('/:id', getFuelLog);
-router.post('/', authorize('FLEET_MANAGER', 'FINANCIAL_ANALYST'), createFuelLog);
-router.put('/:id', authorize('FLEET_MANAGER', 'FINANCIAL_ANALYST'), updateFuelLog);
-router.delete('/:id', authorize('FLEET_MANAGER'), deleteFuelLog);
+router.get('/', requirePermission('fuel:read'), getFuelLogs);
+router.get('/:id', requirePermission('fuel:read'), getFuelLog);
+router.post('/', requirePermission('fuel:create'), createFuelLog);
+router.put('/:id', requirePermission('fuel:create'), updateFuelLog);
+router.delete('/:id', requirePermission('fuel:create'), deleteFuelLog);
 
 export default router;

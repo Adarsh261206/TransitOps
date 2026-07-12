@@ -16,6 +16,7 @@ import { Plus, Fuel, Receipt, DollarSign, TrendingUp } from 'lucide-react';
 import { useToast } from '@/components/shared/Toast';
 import { useSearchParams } from 'react-router-dom';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
+import { usePermission } from '../../components/auth/PermissionGuard';
 
 export function FuelExpensesPage() {
   const [searchParams] = useSearchParams();
@@ -25,6 +26,7 @@ export function FuelExpensesPage() {
   const [vehicleFilter, setVehicleFilter] = useState('');
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { can } = usePermission();
 
   const { data: fuelData, isLoading: fuelLoading } = useQuery({
     queryKey: ['fuel-logs', vehicleFilter],
@@ -55,8 +57,8 @@ export function FuelExpensesPage() {
           <p className="mt-1 text-sm text-muted-foreground">Track fuel consumption, costs, and all operational expenses per vehicle.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowFuelForm(true)}><Fuel className="h-4 w-4 mr-2" /> Add Fuel</Button>
-          <Button onClick={() => setShowExpenseForm(true)}><Plus className="h-4 w-4 mr-2" /> Add Expense</Button>
+          {can('fuel:create') && <Button variant="outline" onClick={() => setShowFuelForm(true)}><Fuel className="h-4 w-4 mr-2" /> Add Fuel</Button>}
+          {can('expenses:create') && <Button onClick={() => setShowExpenseForm(true)}><Plus className="h-4 w-4 mr-2" /> Add Expense</Button>}
         </div>
       </div>
 
@@ -83,7 +85,7 @@ export function FuelExpensesPage() {
 
       {activeTab === 'fuel' && (
         fuelLoading ? <TableSkeleton rows={4} cols={4} /> : fuelLogs.length === 0 ? (
-          <EmptyState title="No fuel logs" description="Record your first fuel entry." action={<Button onClick={() => setShowFuelForm(true)}><Fuel className="h-4 w-4 mr-2" /> Add Fuel</Button>} />
+          <EmptyState title="No fuel logs" description="Record your first fuel entry."           action={can('fuel:create') ? <Button onClick={() => setShowFuelForm(true)}><Fuel className="h-4 w-4 mr-2" /> Add Fuel</Button> : undefined} />
         ) : (
           <div className="overflow-x-auto rounded-xl border">
             <table className="w-full text-sm">
@@ -108,7 +110,7 @@ export function FuelExpensesPage() {
 
       {activeTab === 'expense' && (
         expenseLoading ? <TableSkeleton rows={4} cols={5} /> : expenses.length === 0 ? (
-          <EmptyState title="No expenses" description="Add your first expense entry." action={<Button onClick={() => setShowExpenseForm(true)}><Plus className="h-4 w-4 mr-2" /> Add Expense</Button>} />
+          <EmptyState title="No expenses" description="Add your first expense entry."           action={can('expenses:create') ? <Button onClick={() => setShowExpenseForm(true)}><Plus className="h-4 w-4 mr-2" /> Add Expense</Button> : undefined} />
         ) : (
           <div className="overflow-x-auto rounded-xl border">
             <table className="w-full text-sm">

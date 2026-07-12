@@ -7,10 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { NotificationDropdown } from '@/components/shared/NotificationDropdown';
-import { 
+import {
   Search, Moon, Sun, LogOut, User, ChevronDown,
-  Menu
+  Menu, PlusCircle, CalendarPlus, UserCheck, ShieldCheck,
+  UserX, Fuel, Download, Zap
 } from 'lucide-react';
+import { getQuickActions } from '@/utils/permissions';
+
+const iconMap: Record<string, any> = {
+  PlusCircle, CalendarPlus, UserCheck, ShieldCheck, UserX, Fuel, Download,
+};
 
 export function TopNavbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
   useKeyboardShortcuts();
@@ -18,8 +24,10 @@ export function TopNavbar({ onToggleSidebar }: { onToggleSidebar: () => void }) 
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [showProfile, setShowProfile] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
 
   const roleLabel = user?.role?.replace(/_/g, ' ');
+  const quickActions = getQuickActions(user?.role);
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
@@ -33,6 +41,43 @@ export function TopNavbar({ onToggleSidebar }: { onToggleSidebar: () => void }) 
       </div>
 
       <div className="flex items-center gap-2 ml-auto">
+        {quickActions.length > 0 && (
+          <div className="relative">
+            <Button
+              variant="default"
+              size="sm"
+              className="gap-2 text-xs h-9"
+              onClick={() => setShowQuickActions(!showQuickActions)}
+            >
+              <Zap className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Quick Actions</span>
+            </Button>
+
+            {showQuickActions && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowQuickActions(false)} />
+                <div className="absolute right-0 top-full mt-1 z-50 w-56 rounded-xl border bg-card p-2 shadow-lg">
+                  {quickActions.map((action) => {
+                    const Icon = iconMap[action.icon];
+                    return (
+                      <Button
+                        key={action.label}
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start text-xs"
+                        onClick={() => { navigate(action.path); setShowQuickActions(false); }}
+                      >
+                        {Icon && <Icon className="h-3.5 w-3.5 mr-2" />}
+                        {action.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         <Button variant="ghost" size="icon" onClick={toggleTheme} className="text-muted-foreground">
           {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
@@ -40,9 +85,9 @@ export function TopNavbar({ onToggleSidebar }: { onToggleSidebar: () => void }) 
         <NotificationDropdown />
 
         <div className="relative">
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             className="gap-2 text-sm"
             onClick={() => setShowProfile(!showProfile)}
           >
