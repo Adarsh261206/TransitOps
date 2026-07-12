@@ -51,9 +51,9 @@ export async function createVehicle(req: AuthRequest, res: Response) {
     const vehicle = await prisma.vehicle.create({
       data: {
         ...rest,
-        acquisitionDate: acquisitionDate ? new Date(acquisitionDate) : undefined,
-        insuranceExpiry: insuranceExpiry ? new Date(insuranceExpiry) : undefined,
-        pucExpiry: pucExpiry ? new Date(pucExpiry) : undefined,
+        acquisitionDate: acquisitionDate && typeof acquisitionDate === 'string' ? new Date(acquisitionDate) : undefined,
+        insuranceExpiry: insuranceExpiry && typeof insuranceExpiry === 'string' ? new Date(insuranceExpiry) : undefined,
+        pucExpiry: pucExpiry && typeof pucExpiry === 'string' ? new Date(pucExpiry) : undefined,
       },
     });
     res.status(201).json(vehicle);
@@ -75,9 +75,9 @@ export async function updateVehicle(req: AuthRequest, res: Response) {
       where: { id: req.params.id },
       data: {
         ...rest,
-        acquisitionDate: acquisitionDate !== undefined ? new Date(acquisitionDate) : undefined,
-        insuranceExpiry: insuranceExpiry !== undefined ? new Date(insuranceExpiry) : undefined,
-        pucExpiry: pucExpiry !== undefined ? new Date(pucExpiry) : undefined,
+        acquisitionDate: acquisitionDate && typeof acquisitionDate === 'string' ? new Date(acquisitionDate) : undefined,
+        insuranceExpiry: insuranceExpiry && typeof insuranceExpiry === 'string' ? new Date(insuranceExpiry) : undefined,
+        pucExpiry: pucExpiry && typeof pucExpiry === 'string' ? new Date(pucExpiry) : undefined,
       },
     });
     res.json(vehicle);
