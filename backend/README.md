@@ -238,7 +238,6 @@ npm run db:seed      # Seed sample data
 | Method | Path | Description |
 |---|---|---|
 | GET | `/fleet-manager` | Fleet Manager KPIs |
-| GET | `/dispatcher` | Dispatcher KPIs |
 | GET | `/safety-officer` | Safety Officer KPIs |
 | GET | `/financial-analyst` | Financial Analyst KPIs |
 
@@ -255,17 +254,17 @@ npm run db:seed      # Seed sample data
 
 ## 👥 Roles & Permissions
 
-| Permission | Fleet Manager | Dispatcher | Driver | Safety Officer | Financial Analyst |
-|---|:---:|:---:|:---:|:---:|:---:|
-| Fleet CRUD | ✅ | 👁️ | 👁️ | 👁️ | 👁️ |
-| Driver CRUD | ✅ | 👁️ | 👁️ | ✅ | 👁️ |
-| Trips | 👁️ | ✅ | ✅ | 👁️ | 👁️ |
-| Maintenance | ✅ | ❌ | ❌ | ❌ | 👁️ |
-| Fuel & Expenses | ✅ | ❌ | ❌ | ❌ | ✅ |
-| Reports & Analytics | ✅ | ❌ | ❌ | ❌ | ✅ |
-| Settings | ✅ | 👁️ | ❌ | ❌ | ❌ |
-| Incidents | ❌ | ❌ | ❌ | ✅ | ❌ |
-| Audit Logs | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Permission | Fleet Manager | Driver | Safety Officer | Financial Analyst |
+|---|:---:|:---:|:---:|:---:|
+| Fleet CRUD | ✅ | 👁️ | 👁️ | 👁️ |
+| Driver CRUD | ✅ | 👁️ | ✅ | 👁️ |
+| Trips | 👁️ | ✅ | 👁️ | 👁️ |
+| Maintenance | ✅ | ❌ | ❌ | 👁️ |
+| Fuel & Expenses | ✅ | ❌ | ❌ | ✅ |
+| Reports & Analytics | ✅ | ❌ | ❌ | ✅ |
+| Settings | ✅ | ❌ | ❌ | ❌ |
+| Incidents | ❌ | ❌ | ✅ | ❌ |
+| Audit Logs | ✅ | ❌ | ❌ | ❌ |
 
 > ✅ = Full access · 👁️ = Read only · ❌ = No access
 

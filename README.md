@@ -2,7 +2,7 @@
 
 > Built for **Odoo Hackathon 2026** · Full-stack fleet management system for Indian logistics operations.
 
-TransitOps helps fleet managers, dispatchers, drivers, safety officers, and financial analysts manage vehicles, trips, drivers, fuel, expenses, maintenance, compliance, and reporting — all in one place.
+TransitOps helps fleet managers, drivers, safety officers, and financial analysts manage vehicles, trips, drivers, fuel, expenses, maintenance, compliance, and reporting — all in one place.
 
 ---
 
@@ -148,7 +148,6 @@ All accounts use password: `password123`
 | Role | Email |
 |---|---|
 | Fleet Manager | fleet@transitops.com |
-| Dispatcher | dispatcher@transitops.com |
 | Driver | driver@transitops.com |
 | Safety Officer | safety@transitops.com |
 | Financial Analyst | finance@transitops.com |

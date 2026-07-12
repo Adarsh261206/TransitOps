@@ -48,7 +48,6 @@ frontend/
     │   ├── dashboard/         # Role-based dashboard redirect
     │   ├── dashboards/        # Per-role dashboards
     │   │   ├── FleetManagerDashboard.tsx
-    │   │   ├── DispatcherDashboard.tsx
     │   │   ├── DriverDashboard.tsx
     │   │   ├── SafetyOfficerDashboard.tsx
     │   │   └── FinancialAnalystDashboard.tsx
@@ -127,7 +126,7 @@ npm run lint      # Run oxlint
 | `/vehicles/:id` | Vehicle detail | Fleet Manager + |
 | `/drivers` | Driver list | All roles |
 | `/drivers/:id` | Driver detail | All roles |
-| `/trips` | Trip list + create | Dispatcher, Driver |
+| `/trips` | Trip list + create | Driver, Fleet Manager |
 | `/maintenance` | Maintenance logs | Fleet Manager + |
 | `/fuel-expenses` | Fuel & Expenses | Fleet Manager, Finance |
 | `/reports` | Analytics & Reports | Fleet Manager, Finance |
@@ -135,7 +134,7 @@ npm run lint      # Run oxlint
 | `/compliance` | Compliance overview | Safety Officer + |
 | `/notifications` | Notifications | All roles |
 | `/audit` | Audit logs | Fleet Manager |
-| `/settings` | App settings | Fleet Manager, Dispatcher |
+| `/settings` | App settings | Fleet Manager |
 | `/profile` | User profile | All roles |
 
 ---
