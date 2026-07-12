@@ -70,7 +70,7 @@ export const RolePermissions: Record<string, Permission[]> = {
     Permissions.COMPLIANCE_READ,
     Permissions.ANALYTICS_READ, Permissions.ANALYTICS_EXPORT,
     Permissions.NOTIFICATIONS_READ, Permissions.AUDIT_READ,
-    Permissions.SETTINGS_READ,
+    Permissions.SETTINGS_READ, Permissions.SETTINGS_WRITE,
   ],
   DISPATCHER: [
     Permissions.DRIVERS_READ,

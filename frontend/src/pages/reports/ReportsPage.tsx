@@ -71,8 +71,8 @@ export function ReportsPage() {
           startY: 42, head: [['Metric', 'Value']],
           body: [
             ['Total Vehicles', String(s.totalVehicles ?? 0)], ['Total Drivers', String(s.totalDrivers ?? 0)],
-            ['Total Trips', String(s.totalTrips ?? 0)], ['Total Revenue', `$${(s.totalRevenue ?? 0).toLocaleString()}`],
-            ['Total Cost', `$${(s.totalOperationalCost ?? 0).toLocaleString()}`],
+            ['Total Trips', String(s.totalTrips ?? 0)], ['Total Revenue', `₹${(s.totalRevenue ?? 0).toLocaleString("en-IN")}`],
+            ['Total Cost', `₹${(s.totalOperationalCost ?? 0).toLocaleString("en-IN")}`],
             ['Fleet Utilization', `${u?.utilizationRate ?? 0}%`],
           ], styles: { fontSize: 9 },
         });
@@ -80,7 +80,7 @@ export function ReportsPage() {
         if (r.length) {
           autoTable(doc, {
             startY: (doc as any).lastAutoTable.finalY + 10, head: [['Vehicle', 'Revenue', 'Fuel Cost', 'Maintenance', 'Acquisition', 'ROI']],
-            body: r.map((v: any) => [v.vehicleName, `$${(v.totalRevenue ?? 0).toLocaleString()}`, `$${(v.totalFuelCost ?? 0).toLocaleString()}`, `$${(v.totalMaintenanceCost ?? 0).toLocaleString()}`, `$${(v.acquisitionCost ?? 0).toLocaleString()}`, `${v.roi.toFixed(2)}%`]),
+            body: r.map((v: any) => [v.vehicleName, `₹${(v.totalRevenue ?? 0).toLocaleString("en-IN")}`, `₹${(v.totalFuelCost ?? 0).toLocaleString("en-IN")}`, `₹${(v.totalMaintenanceCost ?? 0).toLocaleString("en-IN")}`, `₹${(v.acquisitionCost ?? 0).toLocaleString("en-IN")}`, `${v.roi.toFixed(2)}%`]),
             styles: { fontSize: 8 },
           });
         }
@@ -88,7 +88,7 @@ export function ReportsPage() {
         if (c?.vehicleCosts?.length) {
           autoTable(doc, {
             startY: (doc as any).lastAutoTable.finalY + 10, head: [['Vehicle', 'Fuel Cost', 'Maintenance', 'Other Expenses']],
-            body: c.vehicleCosts.map((v: any) => [v.vehicleName, `$${(v.fuelCost ?? 0).toLocaleString()}`, `$${(v.maintenanceCost ?? 0).toLocaleString()}`, `$${(v.otherExpenses ?? 0).toLocaleString()}`]),
+            body: c.vehicleCosts.map((v: any) => [v.vehicleName, `₹${(v.fuelCost ?? 0).toLocaleString("en-IN")}`, `₹${(v.maintenanceCost ?? 0).toLocaleString("en-IN")}`, `₹${(v.otherExpenses ?? 0).toLocaleString("en-IN")}`]),
             styles: { fontSize: 8 },
           });
         }
@@ -146,7 +146,7 @@ export function ReportsPage() {
         {[
           { label: 'Fuel Efficiency', value: summary ? `${(summary.totalFuelLiters > 0 ? (summary.totalTrips * 100 / summary.totalFuelLiters) : 0).toFixed(1)} km/L` : '-', icon: Fuel, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/20' },
           { label: 'Fleet Utilization', value: `${utilization?.utilizationRate ?? 0}%`, icon: PieChart, color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/20' },
-          { label: 'Operational Cost', value: summary ? `$${(summary.totalOperationalCost ?? 0).toLocaleString()}` : '-', icon: DollarSign, color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/20' },
+          { label: 'Operational Cost', value: summary ? `₹${(summary.totalOperationalCost ?? 0).toLocaleString("en-IN")}` : '-', icon: DollarSign, color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/20' },
           { label: 'Vehicle ROI', value: roi?.length ? `${(roi.reduce((s: number, v: any) => s + v.roi, 0) / roi.length).toFixed(2)}%` : '-', icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/20' },
         ].map((kpi, i) => (
           <motion.div key={kpi.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
@@ -252,10 +252,10 @@ export function ReportsPage() {
                   {[...roi].sort((a: any, b: any) => a.roi - b.roi).slice(0, 10).map((v: any) => (
                     <tr key={v.vehicleId} className="border-b last:border-0 hover:bg-muted/50">
                       <td className="py-2 font-medium">{v.vehicleName}</td>
-                      <td className="py-2">${v.totalRevenue.toLocaleString()}</td>
-                      <td className="py-2">${v.totalFuelCost.toLocaleString()}</td>
-                      <td className="py-2">${v.totalMaintenanceCost.toLocaleString()}</td>
-                      <td className="py-2">${v.acquisitionCost.toLocaleString()}</td>
+                      <td className="py-2">₹{v.totalRevenue.toLocaleString("en-IN")}</td>
+                      <td className="py-2">₹{v.totalFuelCost.toLocaleString("en-IN")}</td>
+                      <td className="py-2">₹{v.totalMaintenanceCost.toLocaleString("en-IN")}</td>
+                      <td className="py-2">₹{v.acquisitionCost.toLocaleString("en-IN")}</td>
                       <td className="py-2"><span className={`font-semibold ${v.roi >= 0 ? 'text-green-600' : 'text-red-600'}`}>{v.roi.toFixed(2)}%</span></td>
                     </tr>
                   ))}

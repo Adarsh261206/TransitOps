@@ -72,10 +72,10 @@ export default function FinancialAnalystDashboard() {
   ];
 
   const kpiCards = [
-    { label: 'Total Revenue', value: `$${data?.totalRevenue?.toLocaleString() ?? 0}`, icon: DollarSign, color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/20', href: '/reports' },
-      { label: 'Fuel Cost', value: `$${data?.totalFuelCost?.toLocaleString() ?? 0}`, icon: Fuel, color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/20', href: '/fuel-expenses' },
-      { label: 'Other Expenses', value: `$${data?.totalExpenses?.toLocaleString() ?? 0}`, icon: Receipt, color: 'text-red-600', bg: 'bg-red-100 dark:bg-red-900/20', href: '/fuel-expenses' },
-    { label: 'Total Distance', value: `${(data?.totalDistance ?? 0).toLocaleString()} km`, icon: Route, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/20', href: '/trips' },
+    { label: 'Total Revenue', value: `₹${data?.totalRevenue?.toLocaleString('en-IN') ?? 0}`, icon: DollarSign, color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/20', href: '/reports' },
+      { label: 'Fuel Cost', value: `₹${data?.totalFuelCost?.toLocaleString('en-IN') ?? 0}`, icon: Fuel, color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/20', href: '/fuel-expenses' },
+      { label: 'Other Expenses', value: `₹${data?.totalExpenses?.toLocaleString('en-IN') ?? 0}`, icon: Receipt, color: 'text-red-600', bg: 'bg-red-100 dark:bg-red-900/20', href: '/fuel-expenses' },
+    { label: 'Total Distance', value: `${(data?.totalDistance ?? 0).toLocaleString('en-IN')} km`, icon: Route, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/20', href: '/trips' },
     { label: 'ROI', value: `${data?.roi ?? 0}%`, icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/20', href: '/analytics' },
   ];
 
@@ -213,15 +213,15 @@ export default function FinancialAnalystDashboard() {
             <div className="space-y-4">
               <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                 <span className="text-sm font-medium">Total Revenue</span>
-                <span className="text-lg font-bold text-green-600">${data?.totalRevenue?.toLocaleString() ?? 0}</span>
+                <span className="text-lg font-bold text-green-600">₹{data?.totalRevenue?.toLocaleString('en-IN') ?? 0}</span>
               </div>
               <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                 <span className="text-sm font-medium">Total Costs</span>
-                <span className="text-lg font-bold text-red-600">${((data?.totalFuelCost ?? 0) + (data?.totalExpenses ?? 0)).toLocaleString()}</span>
+                <span className="text-lg font-bold text-red-600">₹{((data?.totalFuelCost ?? 0) + (data?.totalExpenses ?? 0)).toLocaleString("en-IN")}</span>
               </div>
               <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                 <span className="text-sm font-medium">Net Profit</span>
-                <span className="text-lg font-bold">${((data?.totalRevenue ?? 0) - (data?.totalFuelCost ?? 0) - (data?.totalExpenses ?? 0)).toLocaleString()}</span>
+                <span className="text-lg font-bold">₹{((data?.totalRevenue ?? 0) - (data?.totalFuelCost ?? 0) - (data?.totalExpenses ?? 0)).toLocaleString("en-IN")}</span>
               </div>
               <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                 <span className="text-sm font-medium">ROI</span>

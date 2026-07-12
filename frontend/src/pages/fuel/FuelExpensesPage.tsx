@@ -64,9 +64,9 @@ export function FuelExpensesPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3 mb-6">
-        <Card><CardContent className="p-4 flex items-center gap-3"><div className="rounded-lg bg-blue-100 dark:bg-blue-900/20 p-2.5"><Fuel className="h-5 w-5 text-blue-600" /></div><div><p className="text-xs text-muted-foreground">Total Fuel Cost</p><p className="text-xl font-bold">${totalFuel.toLocaleString()}</p></div></CardContent></Card>
-        <Card><CardContent className="p-4 flex items-center gap-3"><div className="rounded-lg bg-purple-100 dark:bg-purple-900/20 p-2.5"><Receipt className="h-5 w-5 text-purple-600" /></div><div><p className="text-xs text-muted-foreground">Total Expenses</p><p className="text-xl font-bold">${totalExpenses.toLocaleString()}</p></div></CardContent></Card>
-        <Card><CardContent className="p-4 flex items-center gap-3"><div className="rounded-lg bg-primary/10 p-2.5"><DollarSign className="h-5 w-5 text-primary" /></div><div><p className="text-xs text-muted-foreground">Combined Total</p><p className="text-xl font-bold">${(totalFuel + totalExpenses).toLocaleString()}</p></div></CardContent></Card>
+        <Card><CardContent className="p-4 flex items-center gap-3"><div className="rounded-lg bg-blue-100 dark:bg-blue-900/20 p-2.5"><Fuel className="h-5 w-5 text-blue-600" /></div><div><p className="text-xs text-muted-foreground">Total Fuel Cost</p><p className="text-xl font-bold">₹{totalFuel.toLocaleString("en-IN")}</p></div></CardContent></Card>
+        <Card><CardContent className="p-4 flex items-center gap-3"><div className="rounded-lg bg-purple-100 dark:bg-purple-900/20 p-2.5"><Receipt className="h-5 w-5 text-purple-600" /></div><div><p className="text-xs text-muted-foreground">Total Expenses</p><p className="text-xl font-bold">₹{totalExpenses.toLocaleString("en-IN")}</p></div></CardContent></Card>
+        <Card><CardContent className="p-4 flex items-center gap-3"><div className="rounded-lg bg-primary/10 p-2.5"><DollarSign className="h-5 w-5 text-primary" /></div><div><p className="text-xs text-muted-foreground">Combined Total</p><p className="text-xl font-bold">₹{(totalFuel + totalExpenses).toLocaleString("en-IN")}</p></div></CardContent></Card>
       </div>
 
       {showFuelForm && <FuelForm onClose={() => setShowFuelForm(false)} onSuccess={() => { setShowFuelForm(false); queryClient.invalidateQueries({ queryKey: ['fuel-logs'] }); toast('Fuel log added', 'success'); }} />}
@@ -99,8 +99,8 @@ export function FuelExpensesPage() {
                     <td className="px-4 py-3 font-medium">{f.vehicle?.name} <span className="text-muted-foreground">({f.vehicle?.registrationNumber})</span></td>
                     <td className="px-4 py-3">{new Date(f.date).toLocaleDateString()}</td>
                     <td className="px-4 py-3">{f.liters} L</td>
-                    <td className="px-4 py-3">${f.cost}</td>
-                    <td className="px-4 py-3">${(f.cost / f.liters).toFixed(2)}/L</td>
+                    <td className="px-4 py-3">₹{f.cost.toLocaleString('en-IN')}</td>
+                    <td className="px-4 py-3">₹{(f.cost / f.liters).toFixed(2)}/L</td>
                   </tr>
                 ))}
               </tbody>
@@ -125,7 +125,7 @@ export function FuelExpensesPage() {
                     <td className="px-4 py-3"><Badge variant="secondary">{e.type}</Badge></td>
                     <td className="px-4 py-3 text-muted-foreground">{e.description || '-'}</td>
                     <td className="px-4 py-3">{new Date(e.date).toLocaleDateString()}</td>
-                    <td className="px-4 py-3 font-medium">${e.amount}</td>
+                    <td className="px-4 py-3 font-medium">₹{e.amount.toLocaleString('en-IN')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -204,10 +204,10 @@ function FuelForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () =
             {getFieldError(errors, 'vehicleId') && <p className="text-sm text-destructive">{getFieldError(errors, 'vehicleId')}</p>}
           </div>
           <div className="space-y-1"><label className="text-sm font-medium">Liters *</label><Input className={getFieldError(errors, 'liters') ? 'border-destructive' : ''} type="number" step="0.1" value={form.liters || ''} onChange={e => { setForm(f => ({ ...f, liters: Number(e.target.value) })); setErrors(errs => errs.filter(e => e.field !== 'liters')); }} required min={0} />{getFieldError(errors, 'liters') && <p className="text-sm text-destructive">{getFieldError(errors, 'liters')}</p>}</div>
-          <div className="space-y-1"><label className="text-sm font-medium">Cost ($) *</label><Input className={getFieldError(errors, 'cost') ? 'border-destructive' : ''} type="number" step="0.01" value={form.cost || ''} onChange={e => { setForm(f => ({ ...f, cost: Number(e.target.value) })); setErrors(errs => errs.filter(e => e.field !== 'cost')); }} required min={0} />{getFieldError(errors, 'cost') && <p className="text-sm text-destructive">{getFieldError(errors, 'cost')}</p>}</div>
+          <div className="space-y-1"><label className="text-sm font-medium">Cost (₹) *</label><Input className={getFieldError(errors, 'cost') ? 'border-destructive' : ''} type="number" step="0.01" value={form.cost || ''} onChange={e => { setForm(f => ({ ...f, cost: Number(e.target.value) })); setErrors(errs => errs.filter(e => e.field !== 'cost')); }} required min={0} />{getFieldError(errors, 'cost') && <p className="text-sm text-destructive">{getFieldError(errors, 'cost')}</p>}</div>
           {form.liters > 0 && form.cost > 0 && (
             <div className="text-sm text-muted-foreground col-span-2">
-              Price per liter: <strong>${(form.cost / form.liters).toFixed(2)}</strong>
+              Price per liter: <strong>₹{(form.cost / form.liters).toFixed(2)}</strong>
             </div>
           )}
           <div className="space-y-1"><label className="text-sm font-medium">Date *</label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} required /></div>
@@ -308,7 +308,7 @@ function ExpenseForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             />
             {getFieldError(errors, 'type') && <p className="text-sm text-destructive">{getFieldError(errors, 'type')}</p>}
           </div>
-          <div className="space-y-1"><label className="text-sm font-medium">Amount ($) *</label><Input className={getFieldError(errors, 'amount') ? 'border-destructive' : ''} type="number" step="0.01" value={form.amount || ''} onChange={e => { setForm(f => ({ ...f, amount: Number(e.target.value) })); setErrors(errs => errs.filter(e => e.field !== 'amount')); }} required min={0} />{getFieldError(errors, 'amount') && <p className="text-sm text-destructive">{getFieldError(errors, 'amount')}</p>}</div>
+          <div className="space-y-1"><label className="text-sm font-medium">Amount (₹) *</label><Input className={getFieldError(errors, 'amount') ? 'border-destructive' : ''} type="number" step="0.01" value={form.amount || ''} onChange={e => { setForm(f => ({ ...f, amount: Number(e.target.value) })); setErrors(errs => errs.filter(e => e.field !== 'amount')); }} required min={0} />{getFieldError(errors, 'amount') && <p className="text-sm text-destructive">{getFieldError(errors, 'amount')}</p>}</div>
           <div className="space-y-1"><label className="text-sm font-medium">Date *</label><Input className={getFieldError(errors, 'date') ? 'border-destructive' : ''} type="date" value={form.date} onChange={e => { setForm(f => ({ ...f, date: e.target.value })); setErrors(errs => errs.filter(e => e.field !== 'date')); }} required />{getFieldError(errors, 'date') && <p className="text-sm text-destructive">{getFieldError(errors, 'date')}</p>}</div>
           <div className="space-y-1 sm:col-span-2">
             <SearchableSelect

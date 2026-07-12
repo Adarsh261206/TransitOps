@@ -122,7 +122,7 @@ export function TripsPage() {
                         <span>{trip.vehicle?.name} ({trip.vehicle?.registrationNumber})</span>
                         <span>{trip.driver?.name}</span>
                         <span>{trip.cargoWeight} kg · {trip.plannedDistance} km</span>
-                        {trip.revenue && <span>${trip.revenue}</span>}
+                        {trip.revenue && <span>₹{trip.revenue.toLocaleString('en-IN')}</span>}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -382,7 +382,7 @@ function TripWizard({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
                 </div>
                 <div className="rounded-lg bg-muted/50 p-3">
                   <p className="text-xs text-muted-foreground">Estimated Cost</p>
-                  <p className="text-sm font-medium">${estimatedCost.toFixed(2)}</p>
+                  <p className="text-sm font-medium">₹{estimatedCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
                 <div className="rounded-lg bg-muted/50 p-3">
                   <p className="text-xs text-muted-foreground">Capacity Used</p>
@@ -473,8 +473,8 @@ function CompleteTripDialog({ trip, onSubmit, onClose, loading }: { trip: Trip; 
             <div className="space-y-1"><label className="text-sm font-medium">Actual Distance (km)</label><Input type="number" value={form.actualDistance || ''} onChange={e => setForm(f => ({ ...f, actualDistance: Number(e.target.value) }))} required min={1} /></div>
             <div className="space-y-1"><label className="text-sm font-medium">Fuel Consumed (L)</label><Input type="number" step="0.1" value={form.fuelConsumed || ''} onChange={e => setForm(f => ({ ...f, fuelConsumed: Number(e.target.value) }))} required min={0} /></div>
             <div className="space-y-1"><label className="text-sm font-medium">Final Odometer (km)</label><Input type="number" value={form.finalOdometer || ''} onChange={e => setForm(f => ({ ...f, finalOdometer: Number(e.target.value) }))} required min={0} /></div>
-            <div className="space-y-1"><label className="text-sm font-medium">Revenue ($)</label><Input type="number" value={form.revenue || ''} onChange={e => setForm(f => ({ ...f, revenue: Number(e.target.value) }))} min={0} /></div>
-            <div className="space-y-1"><label className="text-sm font-medium">Toll ($)</label><Input type="number" value={form.toll || ''} onChange={e => setForm(f => ({ ...f, toll: Number(e.target.value) }))} min={0} />
+            <div className="space-y-1"><label className="text-sm font-medium">Revenue (₹)</label><Input type="number" value={form.revenue || ''} onChange={e => setForm(f => ({ ...f, revenue: Number(e.target.value) }))} min={0} /></div>
+            <div className="space-y-1"><label className="text-sm font-medium">Toll (₹)</label><Input type="number" value={form.toll || ''} onChange={e => setForm(f => ({ ...f, toll: Number(e.target.value) }))} min={0} />
               {completeErrors.find(e => e.field === 'toll') && (
                 <p className="text-sm text-destructive">{completeErrors.find(e => e.field === 'toll')!.message}</p>
               )}

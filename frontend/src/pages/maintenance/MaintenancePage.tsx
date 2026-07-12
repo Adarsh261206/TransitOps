@@ -58,7 +58,7 @@ export function MaintenancePage() {
     { key: 'type', header: 'Type' },
     { key: 'priority', header: 'Priority', render: (l: MaintenanceLog) => l.priority ? <Badge variant={l.priority === 'Critical' ? 'destructive' : 'default'}>{l.priority}</Badge> : '-' },
     { key: 'expectedCompletion', header: 'Expected Completion', render: (l: MaintenanceLog) => l.expectedCompletion ? new Date(l.expectedCompletion).toLocaleDateString() : '-' },
-    { key: 'cost', header: 'Cost', render: (l: MaintenanceLog) => `$${l.cost}` },
+    { key: 'cost', header: 'Cost', render: (l: MaintenanceLog) => `₹${l.cost.toLocaleString('en-IN')}` },
     { key: 'date', header: 'Date', render: (l: MaintenanceLog) => new Date(l.date).toLocaleDateString() },
     { key: 'status', header: 'Status', render: (l: MaintenanceLog) => (
       <div className="flex items-center gap-2">
@@ -224,7 +224,7 @@ function MaintenanceForm({ onClose, onSuccess }: { onClose: () => void; onSucces
             />
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium">Cost ($) *</label>
+            <label className="text-sm font-medium">Cost (₹) *</label>
             <Input className={getFieldError(errors, 'cost') ? 'border-destructive' : ''} type="number" value={form.cost || ''} onChange={e => { setForm(f => ({ ...f, cost: Number(e.target.value) })); setErrors(errs => errs.filter(e => e.field !== 'cost')); }} required min={0} />
             {getFieldError(errors, 'cost') && <p className="text-sm text-destructive">{getFieldError(errors, 'cost')}</p>}
           </div>

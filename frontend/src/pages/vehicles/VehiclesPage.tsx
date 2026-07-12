@@ -102,8 +102,8 @@ export function VehiclesPage() {
     { key: 'name', header: 'Vehicle Name' },
     { key: 'type', header: 'Type' },
     { key: 'maxLoadCapacity', header: 'Capacity', render: (v: Vehicle) => `${v.maxLoadCapacity} kg` },
-    { key: 'odometer', header: 'Odometer', render: (v: Vehicle) => `${v.odometer.toLocaleString()} km` },
-    { key: 'acquisitionCost', header: 'Cost', render: (v: Vehicle) => `$${v.acquisitionCost.toLocaleString()}` },
+    { key: 'odometer', header: 'Odometer', render: (v: Vehicle) => `${v.odometer.toLocaleString("en-IN")} km` },
+    { key: 'acquisitionCost', header: 'Cost', render: (v: Vehicle) => `₹${v.acquisitionCost.toLocaleString("en-IN")}` },
     { key: 'status', header: 'Status', render: (v: Vehicle) => <Badge variant={statusColors[v.status]}>{v.status.replace('_', ' ')}</Badge> },
     { key: 'actions', header: 'Actions', render: (v: Vehicle) => (
       <div className="flex gap-1" onClick={e => e.stopPropagation()}>
@@ -201,8 +201,8 @@ function VehicleDetailPage({ vehicle, onBack }: { vehicle: Vehicle; onBack: () =
               <div><span className="text-muted-foreground">Type</span><p className="font-medium">{fullVehicle.type}</p></div>
               <div><span className="text-muted-foreground">Status</span><p><Badge variant={statusColors[fullVehicle.status]}>{fullVehicle.status.replace('_', ' ')}</Badge></p></div>
               <div><span className="text-muted-foreground">Max Load</span><p className="font-medium">{fullVehicle.maxLoadCapacity} kg</p></div>
-              <div><span className="text-muted-foreground">Odometer</span><p className="font-medium">{fullVehicle.odometer.toLocaleString()} km</p></div>
-              <div><span className="text-muted-foreground">Acquisition Cost</span><p className="font-medium">${fullVehicle.acquisitionCost.toLocaleString()}</p></div>
+              <div><span className="text-muted-foreground">Odometer</span><p className="font-medium">{fullVehicle.odometer.toLocaleString('en-IN')} km</p></div>
+              <div><span className="text-muted-foreground">Acquisition Cost</span><p className="font-medium">₹{fullVehicle.acquisitionCost.toLocaleString("en-IN")}</p></div>
               {fullVehicle.manufacturer && <div><span className="text-muted-foreground">Manufacturer</span><p className="font-medium">{fullVehicle.manufacturer}</p></div>}
               {fullVehicle.model && <div><span className="text-muted-foreground">Model</span><p className="font-medium">{fullVehicle.model}</p></div>}
               {fullVehicle.fuelType && <div><span className="text-muted-foreground">Fuel Type</span><p className="font-medium">{fullVehicle.fuelType}</p></div>}
@@ -399,7 +399,7 @@ function VehicleForm({ vehicle, onClose, onSuccess }: { vehicle: Vehicle | null;
             {fe('maxLoadCapacity') && <p className="text-xs text-destructive">{fe('maxLoadCapacity')}</p>}
           </div>
           <div className="space-y-1"><label className="text-sm font-medium">Odometer (km)</label><Input type="number" value={form.odometer || ''} onChange={e => setForm(f => ({ ...f, odometer: Number(e.target.value) }))} min={0} /></div>
-          <div className="space-y-1"><label className="text-sm font-medium">Acquisition Cost ($)</label><Input type="number" value={form.acquisitionCost || ''} onChange={e => setForm(f => ({ ...f, acquisitionCost: Number(e.target.value) }))} min={0} /></div>
+          <div className="space-y-1"><label className="text-sm font-medium">Acquisition Cost (₹)</label><Input type="number" value={form.acquisitionCost || ''} onChange={e => setForm(f => ({ ...f, acquisitionCost: Number(e.target.value) }))} min={0} /></div>
           <div className="space-y-1">
             <label className="text-sm font-medium">Acquisition Date</label>
             <Input type="date" value={form.acquisitionDate} onChange={e => setForm(f => ({ ...f, acquisitionDate: e.target.value }))} className={fe('acquisitionDate') ? 'border-destructive' : ''} />

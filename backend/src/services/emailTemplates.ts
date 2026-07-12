@@ -1,7 +1,7 @@
 // ─── Email HTML Templates ─────────────────────────────────────────────────────
 // All templates share a base layout for consistent branding.
 
-const APP_URL = process.env.APP_URL ?? 'http://localhost:5173';
+const APP_URL = process.env.APP_URL ?? 'http://localhost:5174';
 
 // ─── Base Layout ──────────────────────────────────────────────────────────────
 

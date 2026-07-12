@@ -191,6 +191,19 @@ export async function deleteUser(req: AuthRequest, res: Response) {
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    // Clear all foreign key references before deleting the user
+    await prisma.$transaction([
+      // Nullify createdById on trips (trips remain, just unlinked from user)
+      prisma.trip.updateMany({ where: { createdById: id }, data: { createdById: req.user!.id } }),
+      // Delete user-owned records
+      prisma.auditLog.deleteMany({ where: { userId: id } }),
+      prisma.notification.deleteMany({ where: { userId: id } }),
+      prisma.emailLog.deleteMany({ where: { userId: id } }),
+      prisma.emailVerificationToken.deleteMany({ where: { userId: id } }),
+      prisma.passwordResetToken.deleteMany({ where: { userId: id } }),
+      prisma.incident.updateMany({ where: { reportedById: id }, data: { reportedById: null } }),
+    ]);
+
     await prisma.user.delete({ where: { id } });
 
     await createAuditLog({
