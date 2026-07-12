@@ -132,7 +132,7 @@ export const getSidebarItems = (role: string | undefined): SidebarItem[] => {
     SAFETY_OFFICER: [
       { label: 'Dashboard', path: '/dashboard', icon: 'LayoutDashboard', permission: Permissions.DRIVERS_READ },
       { label: 'Drivers', path: '/drivers', icon: 'Users', permission: Permissions.DRIVERS_READ },
-      { label: 'Compliance', path: '/compliance', icon: 'Shield', permission: Permissions.COMPLIANCE_READ },
+      { label: 'Compliance', path: '/drivers', icon: 'Shield', permission: Permissions.COMPLIANCE_READ },
       { label: 'Trips', path: '/trips', icon: 'Route', permission: Permissions.TRIPS_READ },
       { label: 'Vehicles', path: '/vehicles', icon: 'Truck', permission: Permissions.FLEET_READ },
       { label: 'Settings', path: '/settings', icon: 'Settings', permission: Permissions.SETTINGS_READ },
