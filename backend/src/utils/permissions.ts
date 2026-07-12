@@ -48,6 +48,10 @@ export const Permissions = {
 type Permission = typeof Permissions[keyof typeof Permissions];
 
 export const RolePermissions: Record<string, Permission[]> = {
+  DRIVER: [
+    Permissions.TRIPS_READ, Permissions.FLEET_READ,
+    Permissions.SETTINGS_READ,
+  ],
   FLEET_MANAGER: [
     Permissions.FLEET_READ, Permissions.FLEET_CREATE, Permissions.FLEET_EDIT, Permissions.FLEET_DELETE,
     Permissions.MAINTENANCE_READ, Permissions.MAINTENANCE_CREATE, Permissions.MAINTENANCE_CLOSE,

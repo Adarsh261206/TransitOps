@@ -73,8 +73,8 @@ export default function FinancialAnalystDashboard() {
 
   const kpiCards = [
     { label: 'Total Revenue', value: `$${data?.totalRevenue?.toLocaleString() ?? 0}`, icon: DollarSign, color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/20', href: '/reports' },
-    { label: 'Fuel Cost', value: `$${data?.totalFuelCost?.toLocaleString() ?? 0}`, icon: Fuel, color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/20', href: '/fuel' },
-    { label: 'Other Expenses', value: `$${data?.totalExpenses?.toLocaleString() ?? 0}`, icon: Receipt, color: 'text-red-600', bg: 'bg-red-100 dark:bg-red-900/20', href: '/expenses' },
+      { label: 'Fuel Cost', value: `$${data?.totalFuelCost?.toLocaleString() ?? 0}`, icon: Fuel, color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/20', href: '/fuel-expenses' },
+      { label: 'Other Expenses', value: `$${data?.totalExpenses?.toLocaleString() ?? 0}`, icon: Receipt, color: 'text-red-600', bg: 'bg-red-100 dark:bg-red-900/20', href: '/fuel-expenses' },
     { label: 'Total Distance', value: `${(data?.totalDistance ?? 0).toLocaleString()} km`, icon: Route, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/20', href: '/trips' },
     { label: 'ROI', value: `${data?.roi ?? 0}%`, icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/20', href: '/analytics' },
   ];
@@ -182,13 +182,13 @@ export default function FinancialAnalystDashboard() {
           <CardContent>
             <div className="grid grid-cols-2 gap-3">
               {can(Permissions.EXPENSES_CREATE) && (
-                <Button variant="outline" className="h-auto py-4 flex-col gap-1" onClick={() => navigate('/expenses?action=create')}>
+                <Button variant="outline" className="h-auto py-4 flex-col gap-1" onClick={() => navigate('/fuel-expenses')}>
                   <PlusCircle className="h-5 w-5" />
                   <span className="text-xs font-normal">Add Expense</span>
                 </Button>
               )}
               {can(Permissions.FUEL_CREATE) && (
-                <Button variant="outline" className="h-auto py-4 flex-col gap-1" onClick={() => navigate('/fuel?action=create')}>
+                <Button variant="outline" className="h-auto py-4 flex-col gap-1" onClick={() => navigate('/fuel-expenses')}>
                   <Fuel className="h-5 w-5" />
                   <span className="text-xs font-normal">Add Fuel</span>
                 </Button>
@@ -199,7 +199,7 @@ export default function FinancialAnalystDashboard() {
                   <span className="text-xs font-normal">Export Report</span>
                 </Button>
               )}
-              <Button variant="outline" className="h-auto py-4 flex-col gap-1" onClick={() => navigate('/analytics')}>
+              <Button variant="outline" className="h-auto py-4 flex-col gap-1" onClick={() => navigate('/reports')}>
                 <BarChart3 className="h-5 w-5" />
                 <span className="text-xs font-normal">Analytics</span>
               </Button>

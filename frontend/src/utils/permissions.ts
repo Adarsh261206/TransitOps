@@ -58,6 +58,10 @@ export const Permissions = {
 export type Permission = typeof Permissions[keyof typeof Permissions];
 
 const RolePermissionMap: Record<string, Permission[]> = {
+  DRIVER: [
+    Permissions.TRIPS_READ, Permissions.FLEET_READ,
+    Permissions.SETTINGS_READ,
+  ],
   FLEET_MANAGER: [
     Permissions.FLEET_READ, Permissions.FLEET_CREATE, Permissions.FLEET_EDIT, Permissions.FLEET_DELETE,
     Permissions.MAINTENANCE_READ, Permissions.MAINTENANCE_CREATE, Permissions.MAINTENANCE_CLOSE,
@@ -114,6 +118,12 @@ export interface SidebarItem {
 
 export const getSidebarItems = (role: string | undefined): SidebarItem[] => {
   const items: Record<string, SidebarItem[]> = {
+    DRIVER: [
+      { label: 'Dashboard', path: '/dashboard', icon: 'LayoutDashboard' },
+      { label: 'My Trips', path: '/trips', icon: 'Route', permission: Permissions.TRIPS_READ },
+      { label: 'Vehicles', path: '/vehicles', icon: 'Truck', permission: Permissions.FLEET_READ },
+      { label: 'Settings', path: '/settings', icon: 'Settings', permission: Permissions.SETTINGS_READ },
+    ],
     FLEET_MANAGER: [
       { label: 'Dashboard', path: '/dashboard', icon: 'LayoutDashboard', permission: Permissions.FLEET_READ },
       { label: 'Fleet', path: '/vehicles', icon: 'Truck', permission: Permissions.FLEET_READ },
@@ -159,6 +169,9 @@ export interface QuickAction {
 
 export const getQuickActions = (role: string | undefined): QuickAction[] => {
   const actions: Record<string, QuickAction[]> = {
+    DRIVER: [
+      { label: 'View My Trips', path: '/trips', icon: 'Route', permission: Permissions.TRIPS_READ },
+    ],
     FLEET_MANAGER: [
       { label: 'Add Vehicle', path: '/vehicles?action=create', icon: 'PlusCircle', permission: Permissions.FLEET_CREATE },
       { label: 'Schedule Maintenance', path: '/maintenance?action=create', icon: 'CalendarPlus', permission: Permissions.MAINTENANCE_CREATE },
@@ -183,6 +196,7 @@ export const getQuickActions = (role: string | undefined): QuickAction[] => {
 
 export const getNotificationCategories = (role: string | undefined): string[] => {
   const categories: Record<string, string[]> = {
+    DRIVER: ['trip_assigned', 'trip_completed', 'trip_cancelled'],
     FLEET_MANAGER: ['maintenance_due', 'vehicle_retired', 'vehicle_added'],
     DISPATCHER: ['trip_assigned', 'trip_completed', 'trip_cancelled'],
     SAFETY_OFFICER: ['license_expiring', 'driver_suspended', 'driver_activated'],

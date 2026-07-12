@@ -32,6 +32,7 @@ function RoleBasedDashboard() {
     case 'DISPATCHER': return <DispatcherDashboard />;
     case 'SAFETY_OFFICER': return <SafetyOfficerDashboard />;
     case 'FINANCIAL_ANALYST': return <FinancialAnalystDashboard />;
+    case 'DRIVER': return <DispatcherDashboard />;
     default: return <Navigate to="/login" />;
   }
 }
@@ -58,6 +59,9 @@ function App() {
                   <Route path="/maintenance" element={<PermissionGuard permission={Permissions.MAINTENANCE_READ}><MaintenancePage /></PermissionGuard>} />
                   <Route path="/maintenance/:id" element={<PermissionGuard permission={Permissions.MAINTENANCE_READ}><MaintenancePage /></PermissionGuard>} />
                   <Route path="/fuel-expenses" element={<PermissionGuard permission={Permissions.FUEL_READ}><FuelExpensesPage /></PermissionGuard>} />
+                  <Route path="/fuel" element={<Navigate to="/fuel-expenses" replace />} />
+                  <Route path="/expenses" element={<Navigate to="/fuel-expenses" replace />} />
+                  <Route path="/analytics" element={<Navigate to="/reports" replace />} />
                   <Route path="/reports" element={<PermissionGuard permission={Permissions.REPORTS_READ}><ReportsPage /></PermissionGuard>} />
                   <Route path="/settings" element={<PermissionGuard permission={Permissions.SETTINGS_READ}><SettingsPage /></PermissionGuard>} />
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
