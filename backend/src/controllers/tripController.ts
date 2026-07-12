@@ -75,7 +75,11 @@ export async function createTrip(req: AuthRequest, res: Response) {
         source: data.source,
         destination: data.destination,
         cargoWeight: data.cargoWeight,
+        goodsType: data.goodsType,
+        priority: data.priority,
         plannedDistance: data.plannedDistance,
+        estimatedCost: data.estimatedCost,
+        estimatedFuel: data.estimatedFuel,
         revenue: data.revenue,
         vehicleId: data.vehicleId,
         driverId: data.driverId,
@@ -121,7 +125,7 @@ export async function updateTripStatus(req: AuthRequest, res: Response) {
       case 'COMPLETED': {
         if (trip.status !== 'DISPATCHED') return res.status(400).json({ error: 'Only dispatched trips can be completed' });
 
-        const completionData = tripCompletionSchema.parse({ actualDistance, fuelConsumed, finalOdometer, revenue });
+        const completionData = tripCompletionSchema.parse({ actualDistance, fuelConsumed, finalOdometer, revenue, toll: req.body.toll, remarks: req.body.remarks });
 
         await prisma.$transaction([
           prisma.trip.update({
@@ -132,8 +136,12 @@ export async function updateTripStatus(req: AuthRequest, res: Response) {
               fuelConsumed: completionData.fuelConsumed,
               finalOdometer: completionData.finalOdometer,
               revenue: completionData.revenue ?? trip.revenue,
+              toll: completionData.toll,
+              remarks: completionData.remarks,
             },
           }),
+          // Create expense for toll if provided
+          ...(completionData.toll ? [prisma.expense.create({ data: { vehicleId: trip.vehicleId, type: 'TOLL', amount: completionData.toll, date: new Date(), description: 'Toll for trip' } })] : []),
           prisma.vehicle.update({ where: { id: trip.vehicleId }, data: { status: 'AVAILABLE', odometer: completionData.finalOdometer } }),
           prisma.driver.update({ where: { id: trip.driverId }, data: { status: 'AVAILABLE' } }),
         ]);

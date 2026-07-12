@@ -15,14 +15,43 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
+import { SearchableSelect } from '@/components/shared/SearchableSelect';
 import { motion } from 'framer-motion';
-import { Plus, Search, Pencil, Trash2, Eye, ArrowLeft, Gauge, Weight, DollarSign, MapPin, Calendar, Fuel, Wrench, Receipt, Route } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Eye, ArrowLeft, Gauge, Weight, DollarSign, MapPin, Calendar, Fuel, Wrench, Receipt, Route, User, AlertTriangle } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '@/components/shared/Toast';
 
 const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   AVAILABLE: 'default', ON_TRIP: 'secondary', IN_SHOP: 'destructive', RETIRED: 'outline',
 };
+
+const vehicleTypeOptions = [
+  { value: 'Truck', label: 'Truck' },
+  { value: 'Van', label: 'Van' },
+  { value: 'Mini Truck', label: 'Mini Truck' },
+  { value: 'Container', label: 'Container' },
+  { value: 'Pickup', label: 'Pickup' },
+  { value: 'Bus', label: 'Bus' },
+  { value: 'Other', label: 'Other' },
+];
+
+const fuelTypeOptions = [
+  { value: 'Diesel', label: 'Diesel' },
+  { value: 'Petrol', label: 'Petrol' },
+  { value: 'Electric', label: 'Electric' },
+  { value: 'CNG', label: 'CNG' },
+  { value: 'Hybrid', label: 'Hybrid' },
+];
+
+const ownerOptions = [
+  { value: 'Company', label: 'Company' },
+  { value: 'Lease', label: 'Lease' },
+  { value: 'Vendor', label: 'Vendor' },
+];
+
+function isExpired(date?: string) {
+  return date ? new Date(date) < new Date() : false;
+}
 
 export function VehiclesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -149,6 +178,8 @@ function VehicleDetailPage({ vehicle, onBack }: { vehicle: Vehicle; onBack: () =
     initialData: vehicle,
   });
 
+  const currentTrip = fullVehicle.trips?.find(t => t.status === 'DISPATCHED');
+
   return (
     <PageTransition>
       <Button variant="ghost" size="sm" onClick={onBack} className="mb-4 gap-1"><ArrowLeft className="h-4 w-4" /> Back to Fleet</Button>
@@ -165,18 +196,45 @@ function VehicleDetailPage({ vehicle, onBack }: { vehicle: Vehicle; onBack: () =
               <div><span className="text-muted-foreground">Max Load</span><p className="font-medium">{fullVehicle.maxLoadCapacity} kg</p></div>
               <div><span className="text-muted-foreground">Odometer</span><p className="font-medium">{fullVehicle.odometer.toLocaleString()} km</p></div>
               <div><span className="text-muted-foreground">Acquisition Cost</span><p className="font-medium">${fullVehicle.acquisitionCost.toLocaleString()}</p></div>
+              {fullVehicle.manufacturer && <div><span className="text-muted-foreground">Manufacturer</span><p className="font-medium">{fullVehicle.manufacturer}</p></div>}
+              {fullVehicle.model && <div><span className="text-muted-foreground">Model</span><p className="font-medium">{fullVehicle.model}</p></div>}
+              {fullVehicle.fuelType && <div><span className="text-muted-foreground">Fuel Type</span><p className="font-medium">{fullVehicle.fuelType}</p></div>}
+              {fullVehicle.owner && <div><span className="text-muted-foreground">Owner</span><p className="font-medium">{fullVehicle.owner}</p></div>}
+              {fullVehicle.acquisitionDate && <div><span className="text-muted-foreground">Acquisition Date</span><p className="font-medium">{new Date(fullVehicle.acquisitionDate).toLocaleDateString()}</p></div>}
               {fullVehicle.region && <div><span className="text-muted-foreground">Region</span><p className="font-medium">{fullVehicle.region}</p></div>}
+              <div><span className="text-muted-foreground">Insurance Expiry</span><p className="font-medium flex items-center gap-1">{fullVehicle.insuranceExpiry ? new Date(fullVehicle.insuranceExpiry).toLocaleDateString() : 'N/A'} {isExpired(fullVehicle.insuranceExpiry) && <Badge variant="destructive" className="text-[10px] h-4 px-1">Expired</Badge>}</p></div>
+              <div><span className="text-muted-foreground">PUC Expiry</span><p className="font-medium flex items-center gap-1">{fullVehicle.pucExpiry ? new Date(fullVehicle.pucExpiry).toLocaleDateString() : 'N/A'} {isExpired(fullVehicle.pucExpiry) && <Badge variant="destructive" className="text-[10px] h-4 px-1">Expired</Badge>}</p></div>
             </div>
           </CardContent>
         </Card>
 
         <div className="lg:col-span-2 space-y-6">
+          {currentTrip && (
+            <Card>
+              <CardHeader><CardTitle className="text-sm font-medium flex items-center gap-2"><Route className="h-4 w-4" /> Current Trip</CardTitle></CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between rounded-lg bg-muted/50 p-3 text-sm">
+                  <div className="space-y-1">
+                    <span className="font-medium">{currentTrip.source} → {currentTrip.destination}</span>
+                    {currentTrip.driver && (
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <User className="h-3.5 w-3.5" />
+                        <span>{currentTrip.driver.name}</span>
+                      </div>
+                    )}
+                  </div>
+                  <Badge variant="secondary">In Progress</Badge>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader><CardTitle className="text-sm font-medium flex items-center gap-2"><Route className="h-4 w-4" /> Trip History</CardTitle></CardHeader>
             <CardContent>
               {fullVehicle.trips?.length ? (
                 <div className="space-y-2">
-                  {fullVehicle.trips.map(t => (
+                  {fullVehicle.trips.filter(t => t.status !== 'DISPATCHED').map(t => (
                     <div key={t.id} className="flex items-center justify-between rounded-lg bg-muted/50 p-3 text-sm">
                       <span>{t.source} → {t.destination}</span>
                       <Badge variant={t.status === 'COMPLETED' ? 'default' : 'outline'}>{t.status}</Badge>
@@ -229,6 +287,13 @@ function VehicleForm({ vehicle, onClose, onSuccess }: { vehicle: Vehicle | null;
     odometer: vehicle?.odometer || 0,
     acquisitionCost: vehicle?.acquisitionCost || 0,
     region: vehicle?.region || '',
+    fuelType: vehicle?.fuelType || '',
+    owner: vehicle?.owner || '',
+    acquisitionDate: vehicle?.acquisitionDate || '',
+    manufacturer: vehicle?.manufacturer || '',
+    model: vehicle?.model || '',
+    insuranceExpiry: vehicle?.insuranceExpiry || '',
+    pucExpiry: vehicle?.pucExpiry || '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -252,13 +317,22 @@ function VehicleForm({ vehicle, onClose, onSuccess }: { vehicle: Vehicle | null;
           <div className="space-y-1"><label className="text-sm font-medium">Registration Number *</label><Input value={form.registrationNumber} onChange={e => setForm(f => ({ ...f, registrationNumber: e.target.value }))} required placeholder="e.g., TRK-001" /></div>
           <div className="space-y-1"><label className="text-sm font-medium">Vehicle Name *</label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="e.g., Volvo FH16" /></div>
           <div className="space-y-1"><label className="text-sm font-medium">Type *</label>
-            <Select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
-              <option value="Truck">Truck</option><option value="Van">Van</option><option value="Trailer">Trailer</option><option value="Bus">Bus</option><option value="Other">Other</option>
-            </Select>
+            <SearchableSelect options={vehicleTypeOptions} value={form.type} onChange={v => setForm(f => ({ ...f, type: v }))} placeholder="Select type" />
           </div>
+          <div className="space-y-1"><label className="text-sm font-medium">Manufacturer</label><Input value={form.manufacturer} onChange={e => setForm(f => ({ ...f, manufacturer: e.target.value }))} placeholder="e.g., Volvo" /></div>
+          <div className="space-y-1"><label className="text-sm font-medium">Model</label><Input value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} placeholder="e.g., FH16" /></div>
           <div className="space-y-1"><label className="text-sm font-medium">Max Load Capacity (kg) *</label><Input type="number" value={form.maxLoadCapacity || ''} onChange={e => setForm(f => ({ ...f, maxLoadCapacity: Number(e.target.value) }))} required min={1} /></div>
           <div className="space-y-1"><label className="text-sm font-medium">Odometer (km)</label><Input type="number" value={form.odometer || ''} onChange={e => setForm(f => ({ ...f, odometer: Number(e.target.value) }))} min={0} /></div>
           <div className="space-y-1"><label className="text-sm font-medium">Acquisition Cost ($)</label><Input type="number" value={form.acquisitionCost || ''} onChange={e => setForm(f => ({ ...f, acquisitionCost: Number(e.target.value) }))} min={0} /></div>
+          <div className="space-y-1"><label className="text-sm font-medium">Acquisition Date</label><Input type="date" value={form.acquisitionDate} onChange={e => setForm(f => ({ ...f, acquisitionDate: e.target.value }))} /></div>
+          <div className="space-y-1"><label className="text-sm font-medium">Fuel Type</label>
+            <SearchableSelect options={fuelTypeOptions} value={form.fuelType} onChange={v => setForm(f => ({ ...f, fuelType: v }))} placeholder="Select fuel type" />
+          </div>
+          <div className="space-y-1"><label className="text-sm font-medium">Owner</label>
+            <SearchableSelect options={ownerOptions} value={form.owner} onChange={v => setForm(f => ({ ...f, owner: v }))} placeholder="Select owner" />
+          </div>
+          <div className="space-y-1"><label className="text-sm font-medium">Insurance Expiry</label><Input type="date" value={form.insuranceExpiry} onChange={e => setForm(f => ({ ...f, insuranceExpiry: e.target.value }))} /></div>
+          <div className="space-y-1"><label className="text-sm font-medium">PUC Expiry</label><Input type="date" value={form.pucExpiry} onChange={e => setForm(f => ({ ...f, pucExpiry: e.target.value }))} /></div>
           <div className="space-y-1 sm:col-span-2 lg:col-span-3"><label className="text-sm font-medium">Region</label><Input value={form.region} onChange={e => setForm(f => ({ ...f, region: e.target.value }))} placeholder="e.g., North, South" /></div>
           {error && <p className="text-sm text-destructive col-span-full">{error}</p>}
           <div className="flex gap-2 col-span-full"><Button type="submit" disabled={loading}>{loading ? <Spinner /> : vehicle ? 'Update Vehicle' : 'Register Vehicle'}</Button><Button type="button" variant="outline" onClick={onClose}>Cancel</Button></div>

@@ -15,6 +15,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Plus, Fuel, Receipt, DollarSign, TrendingUp } from 'lucide-react';
 import { useToast } from '@/components/shared/Toast';
 import { useSearchParams } from 'react-router-dom';
+import { SearchableSelect } from '@/components/shared/SearchableSelect';
 
 export function FuelExpensesPage() {
   const [searchParams] = useSearchParams();
@@ -143,7 +144,7 @@ export function FuelExpensesPage() {
 }
 
 function FuelForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [form, setForm] = useState({ vehicleId: '', liters: 0, cost: 0, date: new Date().toISOString().split('T')[0] });
+  const [form, setForm] = useState({ vehicleId: '', liters: 0, cost: 0, date: new Date().toISOString().split('T')[0], driver: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { data: vehicles } = useQuery({ queryKey: ['vehicles-all'], queryFn: async () => { const r = await api.get('/vehicles?limit=100'); return r.data.data as Vehicle[]; } });
@@ -159,15 +160,24 @@ function FuelForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () =
       <CardContent className="p-5">
         <h3 className="font-semibold mb-4">Record Fuel Purchase</h3>
         <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1 sm:col-span-2"><label className="text-sm font-medium">Vehicle *</label>
-            <Select value={form.vehicleId} onChange={e => setForm(f => ({ ...f, vehicleId: e.target.value }))} required>
-              <option value="">Select vehicle</option>
-              {vehicles?.map(v => <option key={v.id} value={v.id}>{v.name} ({v.registrationNumber})</option>)}
-            </Select>
+          <div className="space-y-1 sm:col-span-2">
+            <SearchableSelect
+              label="Vehicle *"
+              options={vehicles?.map(v => ({ value: v.id, label: v.name, sublabel: v.registrationNumber })) || []}
+              value={form.vehicleId}
+              onChange={value => setForm(f => ({ ...f, vehicleId: value }))}
+              placeholder="Select vehicle"
+            />
           </div>
           <div className="space-y-1"><label className="text-sm font-medium">Liters *</label><Input type="number" step="0.1" value={form.liters || ''} onChange={e => setForm(f => ({ ...f, liters: Number(e.target.value) }))} required min={0} /></div>
           <div className="space-y-1"><label className="text-sm font-medium">Cost ($) *</label><Input type="number" step="0.01" value={form.cost || ''} onChange={e => setForm(f => ({ ...f, cost: Number(e.target.value) }))} required min={0} /></div>
+          {form.liters > 0 && form.cost > 0 && (
+            <div className="text-sm text-muted-foreground col-span-2">
+              Price per liter: <strong>${(form.cost / form.liters).toFixed(2)}</strong>
+            </div>
+          )}
           <div className="space-y-1"><label className="text-sm font-medium">Date *</label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} required /></div>
+          <div className="space-y-1"><label className="text-sm font-medium">Driver</label><Input value={form.driver} onChange={e => setForm(f => ({ ...f, driver: e.target.value }))} placeholder="Who logged this?" /></div>
           {error && <p className="text-sm text-destructive col-span-2">{error}</p>}
           <div className="flex gap-2 col-span-2"><Button type="submit" disabled={loading}>{loading ? <Spinner /> : 'Add Fuel Record'}</Button><Button type="button" variant="outline" onClick={onClose}>Cancel</Button></div>
         </form>
@@ -177,10 +187,19 @@ function FuelForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () =
 }
 
 function ExpenseForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [form, setForm] = useState({ vehicleId: '', type: 'TOLL' as const, amount: 0, date: new Date().toISOString().split('T')[0], description: '' });
+  const [form, setForm] = useState({ vehicleId: '', type: 'TOLL', amount: 0, date: new Date().toISOString().split('T')[0], description: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { data: vehicles } = useQuery({ queryKey: ['vehicles-all'], queryFn: async () => { const r = await api.get('/vehicles?limit=100'); return r.data.data as Vehicle[]; } });
+
+  const expenseTypes = [
+    { value: 'TOLL', label: 'Toll' },
+    { value: 'PARKING', label: 'Parking' },
+    { value: 'REPAIR', label: 'Repair' },
+    { value: 'INSURANCE', label: 'Insurance' },
+    { value: 'OTHER', label: 'Other' },
+    { value: 'FUEL', label: 'Fuel' },
+  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,16 +212,23 @@ function ExpenseForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
       <CardContent className="p-5">
         <h3 className="font-semibold mb-4">Record Expense</h3>
         <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1 sm:col-span-2"><label className="text-sm font-medium">Vehicle *</label>
-            <Select value={form.vehicleId} onChange={e => setForm(f => ({ ...f, vehicleId: e.target.value }))} required>
-              <option value="">Select vehicle</option>
-              {vehicles?.map(v => <option key={v.id} value={v.id}>{v.name} ({v.registrationNumber})</option>)}
-            </Select>
+          <div className="space-y-1 sm:col-span-2">
+            <SearchableSelect
+              label="Vehicle *"
+              options={vehicles?.map(v => ({ value: v.id, label: v.name, sublabel: v.registrationNumber })) || []}
+              value={form.vehicleId}
+              onChange={value => setForm(f => ({ ...f, vehicleId: value }))}
+              placeholder="Select vehicle"
+            />
           </div>
-          <div className="space-y-1"><label className="text-sm font-medium">Type *</label>
-            <Select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as any }))}>
-              <option value="TOLL">Toll</option><option value="MAINTENANCE">Maintenance</option><option value="FUEL">Fuel</option><option value="OTHER">Other</option>
-            </Select>
+          <div className="space-y-1">
+            <SearchableSelect
+              label="Type *"
+              options={expenseTypes}
+              value={form.type}
+              onChange={value => setForm(f => ({ ...f, type: value }))}
+              placeholder="Select type"
+            />
           </div>
           <div className="space-y-1"><label className="text-sm font-medium">Amount ($) *</label><Input type="number" step="0.01" value={form.amount || ''} onChange={e => setForm(f => ({ ...f, amount: Number(e.target.value) }))} required min={0} /></div>
           <div className="space-y-1"><label className="text-sm font-medium">Date *</label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} required /></div>

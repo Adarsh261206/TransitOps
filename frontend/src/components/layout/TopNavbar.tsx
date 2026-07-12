@@ -1,17 +1,19 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { NotificationDropdown } from '@/components/shared/NotificationDropdown';
 import { 
-  Search, Bell, Moon, Sun, LogOut, User, ChevronDown,
-  Menu, X
+  Search, Moon, Sun, LogOut, User, ChevronDown,
+  Menu
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 export function TopNavbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
+  useKeyboardShortcuts();
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -27,7 +29,7 @@ export function TopNavbar({ onToggleSidebar }: { onToggleSidebar: () => void }) 
 
       <div className="relative flex-1 max-w-md hidden sm:block">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search vehicles, drivers, trips..." className="pl-9 h-9 bg-muted/50" />
+        <Input placeholder="Search vehicles, drivers, trips... (Ctrl+K)" className="pl-9 h-9 bg-muted/50" />
       </div>
 
       <div className="flex items-center gap-2 ml-auto">
@@ -35,10 +37,7 @@ export function TopNavbar({ onToggleSidebar }: { onToggleSidebar: () => void }) 
           {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
 
-        <Button variant="ghost" size="icon" className="text-muted-foreground relative">
-          <Bell className="h-4 w-4" />
-          <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground flex items-center justify-center">3</span>
-        </Button>
+        <NotificationDropdown />
 
         <div className="relative">
           <Button 

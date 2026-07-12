@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/hooks/useAuth';
 import { ThemeProvider } from '@/hooks/useTheme';
 import { ToastProvider } from '@/components/shared/Toast';
+import { NotificationProvider } from '@/hooks/useNotifications';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { RegisterPage } from '@/pages/auth/RegisterPage';
@@ -25,6 +26,7 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <ToastProvider>
+            <NotificationProvider>
             <BrowserRouter>
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
@@ -43,6 +45,7 @@ function App() {
                 </Route>
               </Routes>
             </BrowserRouter>
+            </NotificationProvider>
           </ToastProvider>
         </AuthProvider>
       </ThemeProvider>

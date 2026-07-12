@@ -10,12 +10,12 @@ import { DataTable } from '@/components/shared/DataTable';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { motion } from 'framer-motion';
 import { Plus, Wrench, CheckCircle, Building2 } from 'lucide-react';
 import { useToast } from '@/components/shared/Toast';
+import { SearchableSelect } from '@/components/shared/SearchableSelect';
 
 export function MaintenancePage() {
   const [showForm, setShowForm] = useState(false);
@@ -39,6 +39,8 @@ export function MaintenancePage() {
     { key: 'vehicle', header: 'Vehicle', render: (l: MaintenanceLog) => <span className="font-medium">{l.vehicle?.name} <span className="text-muted-foreground">({l.vehicle?.registrationNumber})</span></span> },
     { key: 'description', header: 'Service' },
     { key: 'type', header: 'Type' },
+    { key: 'priority', header: 'Priority', render: (l: MaintenanceLog) => l.priority ? <Badge variant={l.priority === 'Critical' ? 'destructive' : 'default'}>{l.priority}</Badge> : '-' },
+    { key: 'expectedCompletion', header: 'Expected Completion', render: (l: MaintenanceLog) => l.expectedCompletion ? new Date(l.expectedCompletion).toLocaleDateString() : '-' },
     { key: 'cost', header: 'Cost', render: (l: MaintenanceLog) => `$${l.cost}` },
     { key: 'date', header: 'Date', render: (l: MaintenanceLog) => new Date(l.date).toLocaleDateString() },
     { key: 'status', header: 'Status', render: (l: MaintenanceLog) => (
@@ -79,7 +81,7 @@ export function MaintenancePage() {
 }
 
 function MaintenanceForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [form, setForm] = useState({ vehicleId: '', description: '', type: 'Preventive', cost: 0, date: new Date().toISOString().split('T')[0], vendor: '' });
+  const [form, setForm] = useState({ vehicleId: '', description: '', type: 'Oil Change', cost: 0, date: new Date().toISOString().split('T')[0], vendor: '', priority: '', expectedCompletion: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -102,30 +104,65 @@ function MaintenanceForm({ onClose, onSuccess }: { onClose: () => void; onSucces
         <p className="text-xs text-muted-foreground mb-4">Vehicle status will automatically change to In Shop.</p>
         <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1 sm:col-span-2">
-            <label className="text-sm font-medium">Vehicle *</label>
-            <Select value={form.vehicleId} onChange={e => setForm(f => ({ ...f, vehicleId: e.target.value }))} required>
-              <option value="">Select vehicle</option>
-              {vehicles?.filter(v => v.status !== 'RETIRED').map(v => <option key={v.id} value={v.id}>{v.name} ({v.registrationNumber}) - {v.status.replace('_', ' ')}</option>)}
-            </Select>
+            <SearchableSelect
+              label="Vehicle *"
+              placeholder="Select vehicle"
+              options={vehicles?.filter(v => v.status !== 'RETIRED').map(v => ({
+                value: v.id,
+                label: v.name,
+                sublabel: `${v.registrationNumber} - ${v.status.replace('_', ' ')}`
+              })) || []}
+              value={form.vehicleId}
+              onChange={v => setForm(f => ({ ...f, vehicleId: v }))}
+            />
           </div>
           <div className="space-y-1 sm:col-span-2">
             <label className="text-sm font-medium">Service Description *</label>
             <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} required placeholder="e.g., Oil Change & Filter Replacement" />
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium">Service Type *</label>
-            <Select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
-              <option value="Preventive">Preventive</option><option value="Corrective">Corrective</option><option value="Inspection">Inspection</option>
-              <option value="Tire">Tire</option><option value="Brake">Brake</option><option value="Engine">Engine</option><option value="Other">Other</option>
-            </Select>
+            <SearchableSelect
+              label="Service Type *"
+              placeholder="Select type"
+              options={[
+                { value: 'Oil Change', label: 'Oil Change' },
+                { value: 'Tyre', label: 'Tyre' },
+                { value: 'Engine', label: 'Engine' },
+                { value: 'Brake', label: 'Brake' },
+                { value: 'Insurance', label: 'Insurance' },
+                { value: 'Repair', label: 'Repair' },
+                { value: 'Inspection', label: 'Inspection' },
+                { value: 'Other', label: 'Other' },
+              ]}
+              value={form.type}
+              onChange={v => setForm(f => ({ ...f, type: v }))}
+            />
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium">Cost ($) *</label>
             <Input type="number" value={form.cost || ''} onChange={e => setForm(f => ({ ...f, cost: Number(e.target.value) }))} required min={0} />
           </div>
           <div className="space-y-1">
+            <SearchableSelect
+              label="Priority"
+              placeholder="Select priority"
+              options={[
+                { value: 'Low', label: 'Low' },
+                { value: 'Medium', label: 'Medium' },
+                { value: 'High', label: 'High' },
+                { value: 'Critical', label: 'Critical' },
+              ]}
+              value={form.priority}
+              onChange={v => setForm(f => ({ ...f, priority: v }))}
+            />
+          </div>
+          <div className="space-y-1">
             <label className="text-sm font-medium">Date *</label>
             <Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} required />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Expected Completion</label>
+            <Input type="date" value={form.expectedCompletion} onChange={e => setForm(f => ({ ...f, expectedCompletion: e.target.value }))} />
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium">Vendor</label>

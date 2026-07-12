@@ -16,6 +16,7 @@ import { motion } from 'framer-motion';
 import { Plus, Route, ArrowRight, Send, CheckCircle, XCircle, ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react';
 import { useToast } from '@/components/shared/Toast';
 import { useSearchParams } from 'react-router-dom';
+import { SearchableSelect } from '@/components/shared/SearchableSelect';
 
 const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   DRAFT: 'outline', DISPATCHED: 'secondary', COMPLETED: 'default', CANCELLED: 'destructive',
@@ -163,12 +164,26 @@ export function TripsPage() {
 
 function TripWizard({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [step, setStep] = useState(0);
-  const [form, setForm] = useState({ source: '', destination: '', vehicleId: '', driverId: '', cargoWeight: 0, plannedDistance: 0, revenue: 0 });
+  const [form, setForm] = useState({ source: '', destination: '', vehicleId: '', driverId: '', cargoWeight: 0, plannedDistance: 0, revenue: 0, goodsType: '', priority: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const { data: vehicles } = useQuery({ queryKey: ['vehicles-available'], queryFn: async () => { const r = await api.get('/vehicles?status=AVAILABLE&limit=100'); return r.data.data as Vehicle[]; } });
   const { data: drivers } = useQuery({ queryKey: ['drivers-available'], queryFn: async () => { const r = await api.get('/drivers?status=AVAILABLE'); return r.data as Driver[]; } });
+
+  const goodsTypeOptions = [
+    { value: 'Fragile', label: 'Fragile' },
+    { value: 'Hazardous', label: 'Hazardous' },
+    { value: 'Perishable', label: 'Perishable' },
+    { value: 'Normal', label: 'Normal' },
+  ];
+
+  const priorityOptions = [
+    { value: 'Low', label: 'Low' },
+    { value: 'Medium', label: 'Medium' },
+    { value: 'High', label: 'High' },
+    { value: 'Critical', label: 'Critical' },
+  ];
 
   const steps = [
     { title: 'Source', field: 'source', placeholder: 'e.g., Warehouse A - NYC', type: 'text' },
@@ -177,18 +192,38 @@ function TripWizard({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
     { title: 'Driver', field: 'driverId', type: 'select', options: drivers?.map(d => ({ value: d.id, label: `${d.name} (${d.licenseNumber})` })) || [] },
     { title: 'Cargo Weight', field: 'cargoWeight', placeholder: 'Weight in kg', type: 'number' },
     { title: 'Distance', field: 'plannedDistance', placeholder: 'Distance in km', type: 'number' },
+    { title: 'Goods Type', field: 'goodsType', type: 'searchable-select' },
+    { title: 'Priority', field: 'priority', type: 'searchable-select' },
+    { title: 'Review & Dispatch', field: '', type: 'review' },
   ];
 
-  const handleNext = () => {
-    if (step < steps.length - 1) setStep(s => s + 1);
-    else handleSubmit();
-  };
+  const selectedVehicle = vehicles?.find(v => v.id === form.vehicleId);
+  const capacityUsed = selectedVehicle && form.cargoWeight > 0 ? Math.round((form.cargoWeight / selectedVehicle.maxLoadCapacity) * 100) : 0;
+  const estimatedFuel = form.plannedDistance * 0.3;
+  const estimatedCost = form.plannedDistance * 1.5;
 
-  const handleSubmit = async () => {
+  const warnings: string[] = [];
+  if (selectedVehicle && form.cargoWeight > selectedVehicle.maxLoadCapacity) {
+    warnings.push(`Cargo weight (${form.cargoWeight}kg) exceeds vehicle max load (${selectedVehicle.maxLoadCapacity}kg).`);
+  }
+  if (!form.goodsType) warnings.push('Goods type not specified.');
+  if (!form.priority) warnings.push('Priority not specified.');
+  if (!form.source || !form.destination) warnings.push('Route incomplete.');
+  if (!form.vehicleId) warnings.push('No vehicle assigned.');
+  if (!form.driverId) warnings.push('No driver assigned.');
+  if (!form.plannedDistance || form.plannedDistance <= 0) warnings.push('Planned distance not set.');
+
+  const handleNext = async () => {
+    if (step < steps.length - 1) {
+      setStep(s => s + 1);
+      return;
+    }
     setError('');
     setLoading(true);
     try {
-      await api.post('/trips', form);
+      const createRes = await api.post('/trips', form);
+      const tripId = createRes.data.data?.id || createRes.data.id;
+      await api.patch(`/trips/${tripId}/status`, { status: 'DISPATCHED' });
       onSuccess();
     } catch (err: any) { setError(err.response?.data?.error || 'Failed to create trip'); } finally { setLoading(false); }
   };
@@ -216,13 +251,65 @@ function TripWizard({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
               <option value="">Select {current.title}</option>
               {current.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </Select>
+          ) : current.type === 'searchable-select' ? (
+            <SearchableSelect
+              options={current.field === 'goodsType' ? goodsTypeOptions : priorityOptions}
+              value={form[current.field as keyof typeof form] as string}
+              onChange={v => setForm(f => ({ ...f, [current.field]: v }))}
+              placeholder={`Select ${current.title}`}
+            />
+          ) : current.type === 'review' ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-xs text-muted-foreground">Vehicle</p>
+                  <p className="text-sm font-medium">{selectedVehicle?.name || 'Not selected'}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-xs text-muted-foreground">Driver</p>
+                  <p className="text-sm font-medium">{form.driverId ? drivers?.find(d => d.id === form.driverId)?.name : 'Not selected'}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-xs text-muted-foreground">Estimated Fuel</p>
+                  <p className="text-sm font-medium">{estimatedFuel.toFixed(1)} L</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-xs text-muted-foreground">Estimated Cost</p>
+                  <p className="text-sm font-medium">${estimatedCost.toFixed(2)}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-xs text-muted-foreground">Capacity Used</p>
+                  <p className="text-sm font-medium">{capacityUsed}%</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-xs text-muted-foreground">Goods Type</p>
+                  <p className="text-sm font-medium">{form.goodsType || 'Not specified'}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-xs text-muted-foreground">Priority</p>
+                  <p className="text-sm font-medium">{form.priority || 'Not specified'}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-xs text-muted-foreground">Distance</p>
+                  <p className="text-sm font-medium">{form.plannedDistance || 0} km</p>
+                </div>
+              </div>
+              {warnings.length > 0 && (
+                <div className="rounded-lg bg-destructive/10 p-3">
+                  <p className="text-xs font-semibold text-destructive mb-1">Warnings</p>
+                  <ul className="text-xs text-destructive/80 space-y-0.5">
+                    {warnings.map((w, i) => <li key={i}>• {w}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
           ) : (
             <Input type={current.type} placeholder={current.placeholder} value={(form[current.field as keyof typeof form] as number || '') as any} onChange={e => setForm(f => ({ ...f, [current.field]: current.type === 'number' ? Number(e.target.value) : e.target.value }))} required min={0} />
           )}
         </div>
 
         <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground mb-4">
-          <strong>Review:</strong> {form.source || '?'} → {form.destination || '?'} · Vehicle: {form.vehicleId ? vehicles?.find(v => v.id === form.vehicleId)?.name : '?'} · Driver: {form.driverId ? drivers?.find(d => d.id === form.driverId)?.name : '?'} · {form.cargoWeight || '?'}kg · {form.plannedDistance || '?'}km
+          <strong>Review:</strong> {form.source || '?'} → {form.destination || '?'} · Vehicle: {form.vehicleId ? vehicles?.find(v => v.id === form.vehicleId)?.name : '?'} · Driver: {form.driverId ? drivers?.find(d => d.id === form.driverId)?.name : '?'} · {form.cargoWeight || '?'}kg · {form.plannedDistance || '?'}km · {form.goodsType || '?'} · {form.priority || '?'}
         </div>
 
         {error && <p className="text-sm text-destructive mb-4">{error}</p>}
@@ -241,7 +328,7 @@ function TripWizard({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
 }
 
 function CompleteTripDialog({ trip, onSubmit, onClose, loading }: { trip: Trip; onSubmit: (data: any) => void; onClose: () => void; loading: boolean }) {
-  const [form, setForm] = useState({ actualDistance: 0, fuelConsumed: 0, finalOdometer: 0, revenue: trip.revenue || 0 });
+  const [form, setForm] = useState({ actualDistance: 0, fuelConsumed: 0, finalOdometer: 0, revenue: trip.revenue || 0, toll: 0, remarks: '' });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -254,6 +341,8 @@ function CompleteTripDialog({ trip, onSubmit, onClose, loading }: { trip: Trip; 
             <div className="space-y-1"><label className="text-sm font-medium">Fuel Consumed (L)</label><Input type="number" step="0.1" value={form.fuelConsumed || ''} onChange={e => setForm(f => ({ ...f, fuelConsumed: Number(e.target.value) }))} required min={0} /></div>
             <div className="space-y-1"><label className="text-sm font-medium">Final Odometer (km)</label><Input type="number" value={form.finalOdometer || ''} onChange={e => setForm(f => ({ ...f, finalOdometer: Number(e.target.value) }))} required min={0} /></div>
             <div className="space-y-1"><label className="text-sm font-medium">Revenue ($)</label><Input type="number" value={form.revenue || ''} onChange={e => setForm(f => ({ ...f, revenue: Number(e.target.value) }))} min={0} /></div>
+            <div className="space-y-1"><label className="text-sm font-medium">Toll ($)</label><Input type="number" value={form.toll || ''} onChange={e => setForm(f => ({ ...f, toll: Number(e.target.value) }))} min={0} /></div>
+            <div className="space-y-1"><label className="text-sm font-medium">Remarks</label><Input type="text" value={form.remarks} onChange={e => setForm(f => ({ ...f, remarks: e.target.value }))} placeholder="Any remarks..." /></div>
             <div className="flex gap-2 pt-2"><Button type="submit" disabled={loading}>{loading ? <Spinner /> : 'Complete Trip'}</Button><Button type="button" variant="outline" onClick={onClose}>Cancel</Button></div>
           </form>
         </CardContent>

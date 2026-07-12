@@ -47,7 +47,15 @@ export async function createVehicle(req: AuthRequest, res: Response) {
     const existing = await prisma.vehicle.findUnique({ where: { registrationNumber: data.registrationNumber } });
     if (existing) return res.status(400).json({ error: 'Registration number already exists' });
 
-    const vehicle = await prisma.vehicle.create({ data });
+    const { acquisitionDate, insuranceExpiry, pucExpiry, ...rest } = data;
+    const vehicle = await prisma.vehicle.create({
+      data: {
+        ...rest,
+        acquisitionDate: acquisitionDate ? new Date(acquisitionDate) : undefined,
+        insuranceExpiry: insuranceExpiry ? new Date(insuranceExpiry) : undefined,
+        pucExpiry: pucExpiry ? new Date(pucExpiry) : undefined,
+      },
+    });
     res.status(201).json(vehicle);
   } catch (err: any) {
     if (err.issues) return res.status(400).json({ error: 'Validation error', details: err.issues });
@@ -62,7 +70,16 @@ export async function updateVehicle(req: AuthRequest, res: Response) {
       const existing = await prisma.vehicle.findFirst({ where: { registrationNumber: data.registrationNumber, NOT: { id: req.params.id } } });
       if (existing) return res.status(400).json({ error: 'Registration number already in use' });
     }
-    const vehicle = await prisma.vehicle.update({ where: { id: req.params.id }, data });
+    const { acquisitionDate, insuranceExpiry, pucExpiry, ...rest } = data;
+    const vehicle = await prisma.vehicle.update({
+      where: { id: req.params.id },
+      data: {
+        ...rest,
+        acquisitionDate: acquisitionDate !== undefined ? new Date(acquisitionDate) : undefined,
+        insuranceExpiry: insuranceExpiry !== undefined ? new Date(insuranceExpiry) : undefined,
+        pucExpiry: pucExpiry !== undefined ? new Date(pucExpiry) : undefined,
+      },
+    });
     res.json(vehicle);
   } catch (err: any) {
     if (err.issues) return res.status(400).json({ error: 'Validation error', details: err.issues });

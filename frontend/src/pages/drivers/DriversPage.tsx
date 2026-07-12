@@ -14,8 +14,9 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
-import { Plus, Search, Pencil, Trash2, Eye, ArrowLeft, Phone, Award, CalendarDays, IdCard, AlertTriangle, Route } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Eye, ArrowLeft, Phone, Award, CalendarDays, IdCard, AlertTriangle, Route, ChevronRight } from 'lucide-react';
 import { useToast } from '@/components/shared/Toast';
+import { SearchableSelect } from '@/components/shared/SearchableSelect';
 
 const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   AVAILABLE: 'default', ON_TRIP: 'secondary', OFF_DUTY: 'outline', SUSPENDED: 'destructive',
@@ -141,6 +142,7 @@ function DriverProfilePage({ driver, onBack }: { driver: Driver; onBack: () => v
               <div>
                 <CardTitle className="text-lg">{fullDriver.name}</CardTitle>
                 <Badge variant={statusColors[fullDriver.status]}>{fullDriver.status.replace('_', ' ')}</Badge>
+                {expired && <Badge variant="destructive" className="ml-1">EXPIRED</Badge>}
               </div>
             </div>
           </CardHeader>
@@ -151,6 +153,9 @@ function DriverProfilePage({ driver, onBack }: { driver: Driver; onBack: () => v
               <div><span className="text-muted-foreground">Expiry</span><p className={`font-medium ${expired ? 'text-destructive' : ''}`}>{expired ? '⚠ EXPIRED' : new Date(fullDriver.licenseExpiryDate).toLocaleDateString()}</p></div>
               <div><span className="text-muted-foreground">Contact</span><p className="font-medium">{fullDriver.contactNumber}</p></div>
               <div><span className="text-muted-foreground">Safety Score</span><p className="font-medium text-lg">{fullDriver.safetyScore}/10</p></div>
+              {fullDriver.emergencyContact && (
+                <div className="col-span-2"><span className="text-muted-foreground">Emergency Contact</span><p className="font-medium">{fullDriver.emergencyContact}{fullDriver.emergencyPhone ? ` (${fullDriver.emergencyPhone})` : ''}</p></div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -192,9 +197,11 @@ function DriverProfilePage({ driver, onBack }: { driver: Driver; onBack: () => v
 }
 
 function DriverForm({ driver, onClose, onSuccess }: { driver: Driver | null; onClose: () => void; onSuccess: () => void }) {
+  const [step, setStep] = useState(1);
   const [form, setForm] = useState({
-    name: driver?.name || '', licenseNumber: driver?.licenseNumber || '', licenseCategory: driver?.licenseCategory || 'Class B',
+    name: driver?.name || '', licenseNumber: driver?.licenseNumber || '', licenseCategory: driver?.licenseCategory || 'LMV',
     licenseExpiryDate: driver?.licenseExpiryDate?.split('T')[0] || '', contactNumber: driver?.contactNumber || '', safetyScore: driver?.safetyScore || 5,
+    emergencyContact: driver?.emergencyContact || '', emergencyPhone: driver?.emergencyPhone || '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -204,9 +211,24 @@ function DriverForm({ driver, onClose, onSuccess }: { driver: Driver | null; onC
     setError('');
     setLoading(true);
     try {
-      driver ? await api.put(`/drivers/${driver.id}`, form) : await api.post('/drivers', form);
+      const { emergencyContact: ec, emergencyPhone: ep, ...rest } = form;
+      const payload = { ...rest, ...(ec ? { emergencyContact: ec } : {}), ...(ep ? { emergencyPhone: ep } : {}) };
+      driver ? await api.put(`/drivers/${driver.id}`, payload) : await api.post('/drivers', payload);
       onSuccess();
     } catch (err: any) { setError(err.response?.data?.error || 'Operation failed'); } finally { setLoading(false); }
+  };
+
+  const steps = [
+    { label: 'Personal Details', fields: ['name', 'contactNumber'] },
+    { label: 'License', fields: ['licenseNumber', 'licenseCategory', 'licenseExpiryDate'] },
+    { label: 'Emergency Contact', fields: ['emergencyContact', 'emergencyPhone'] },
+    { label: 'Review', fields: [] },
+  ];
+
+  const canProceed = () => {
+    if (step === 1) return form.name && form.contactNumber;
+    if (step === 2) return form.licenseNumber && form.licenseCategory && form.licenseExpiryDate;
+    return true;
   };
 
   return (
@@ -214,19 +236,81 @@ function DriverForm({ driver, onClose, onSuccess }: { driver: Driver | null; onC
       <CardContent className="p-5">
         <h3 className="font-semibold mb-1">{driver ? 'Edit Driver' : 'Register New Driver'}</h3>
         <p className="text-xs text-muted-foreground mb-4">Enter driver details. License number must be unique.</p>
-        <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1"><label className="text-sm font-medium">Full Name *</label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required /></div>
-          <div className="space-y-1"><label className="text-sm font-medium">License Number *</label><Input value={form.licenseNumber} onChange={e => setForm(f => ({ ...f, licenseNumber: e.target.value }))} required /></div>
-          <div className="space-y-1"><label className="text-sm font-medium">License Category *</label>
-            <Select value={form.licenseCategory} onChange={e => setForm(f => ({ ...f, licenseCategory: e.target.value }))}>
-              <option value="Class A">Class A</option><option value="Class B">Class B</option><option value="Class C">Class C</option><option value="Class D">Class D</option>
-            </Select>
+
+        <div className="flex items-center gap-2 mb-4 text-sm">
+          {steps.map((s, i) => (
+            <div key={s.label} className={`flex items-center gap-1 ${step === i + 1 ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+              <div className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${step === i + 1 ? 'bg-primary text-primary-foreground' : step > i + 1 ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'}`}>
+                {step > i + 1 ? '✓' : i + 1}
+              </div>
+              <span className="hidden sm:inline">{s.label}</span>
+              {i < steps.length - 1 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground hidden sm:block" />}
+            </div>
+          ))}
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          {step === 1 && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1"><label className="text-sm font-medium">Full Name *</label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required /></div>
+              <div className="space-y-1"><label className="text-sm font-medium">Contact Number *</label><Input value={form.contactNumber} onChange={e => setForm(f => ({ ...f, contactNumber: e.target.value }))} required /></div>
+              <div className="space-y-1"><label className="text-sm font-medium">Safety Score (0-10)</label><Input type="number" step="0.1" min="0" max="10" value={form.safetyScore} onChange={e => setForm(f => ({ ...f, safetyScore: Number(e.target.value) }))} /></div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1"><label className="text-sm font-medium">License Number *</label><Input value={form.licenseNumber} onChange={e => setForm(f => ({ ...f, licenseNumber: e.target.value }))} required /></div>
+              <div className="space-y-1"><label className="text-sm font-medium">License Category *</label>
+                <SearchableSelect
+                  options={[
+                    { value: 'LMV', label: 'LMV' },
+                    { value: 'HMV', label: 'HMV' },
+                    { value: 'Trailer', label: 'Trailer' },
+                    { value: 'Transport', label: 'Transport' },
+                  ]}
+                  value={form.licenseCategory}
+                  onChange={v => setForm(f => ({ ...f, licenseCategory: v }))}
+                />
+              </div>
+              <div className="space-y-1"><label className="text-sm font-medium">License Expiry Date *</label><Input type="date" value={form.licenseExpiryDate} onChange={e => setForm(f => ({ ...f, licenseExpiryDate: e.target.value }))} required /></div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1"><label className="text-sm font-medium">Emergency Contact Name</label><Input value={form.emergencyContact} onChange={e => setForm(f => ({ ...f, emergencyContact: e.target.value }))} /></div>
+              <div className="space-y-1"><label className="text-sm font-medium">Emergency Phone</label><Input value={form.emergencyPhone} onChange={e => setForm(f => ({ ...f, emergencyPhone: e.target.value }))} /></div>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div><span className="text-muted-foreground">Full Name</span><p className="font-medium">{form.name}</p></div>
+                <div><span className="text-muted-foreground">Contact Number</span><p className="font-medium">{form.contactNumber}</p></div>
+                <div><span className="text-muted-foreground">License Number</span><p className="font-medium">{form.licenseNumber}</p></div>
+                <div><span className="text-muted-foreground">License Category</span><p className="font-medium">{form.licenseCategory}</p></div>
+                <div><span className="text-muted-foreground">License Expiry</span><p className="font-medium">{form.licenseExpiryDate}</p></div>
+                <div><span className="text-muted-foreground">Safety Score</span><p className="font-medium">{form.safetyScore}/10</p></div>
+                {form.emergencyContact && (
+                  <div className="col-span-2"><span className="text-muted-foreground">Emergency Contact</span><p className="font-medium">{form.emergencyContact}{form.emergencyPhone ? ` (${form.emergencyPhone})` : ''}</p></div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {error && <p className="text-sm text-destructive mt-2">{error}</p>}
+
+          <div className="flex gap-2 mt-4">
+            {step > 1 && <Button type="button" variant="outline" onClick={() => setStep(s => s - 1)}>Back</Button>}
+            {step < 4 ? (
+              <Button type="button" disabled={!canProceed()} onClick={() => setStep(s => s + 1)}>Next</Button>
+            ) : (
+              <Button type="submit" disabled={loading}>{loading ? <Spinner /> : driver ? 'Update' : 'Register'}</Button>
+            )}
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
           </div>
-          <div className="space-y-1"><label className="text-sm font-medium">License Expiry Date *</label><Input type="date" value={form.licenseExpiryDate} onChange={e => setForm(f => ({ ...f, licenseExpiryDate: e.target.value }))} required /></div>
-          <div className="space-y-1"><label className="text-sm font-medium">Contact Number *</label><Input value={form.contactNumber} onChange={e => setForm(f => ({ ...f, contactNumber: e.target.value }))} required /></div>
-          <div className="space-y-1"><label className="text-sm font-medium">Safety Score (0-10)</label><Input type="number" step="0.1" min="0" max="10" value={form.safetyScore} onChange={e => setForm(f => ({ ...f, safetyScore: Number(e.target.value) }))} /></div>
-          {error && <p className="text-sm text-destructive col-span-2">{error}</p>}
-          <div className="flex gap-2 col-span-2"><Button type="submit" disabled={loading}>{loading ? <Spinner /> : driver ? 'Update' : 'Register'}</Button><Button type="button" variant="outline" onClick={onClose}>Cancel</Button></div>
         </form>
       </CardContent>
     </Card>

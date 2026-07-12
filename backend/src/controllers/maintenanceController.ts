@@ -47,8 +47,13 @@ export async function createMaintenanceLog(req: AuthRequest, res: Response) {
 
     // Creating maintenance auto-changes vehicle status to IN_SHOP
     const log = await prisma.$transaction(async (tx) => {
+      const { expectedCompletion, ...rest } = data;
       const mLog = await tx.maintenanceLog.create({
-        data: { ...data, date: new Date(data.date) },
+        data: {
+          ...rest,
+          date: new Date(rest.date),
+          expectedCompletion: expectedCompletion ? new Date(expectedCompletion) : undefined,
+        },
       });
       await tx.vehicle.update({ where: { id: data.vehicleId }, data: { status: 'IN_SHOP' } });
       return mLog;
