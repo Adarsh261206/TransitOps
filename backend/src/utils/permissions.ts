@@ -63,6 +63,7 @@ export const RolePermissions: Record<string, Permission[]> = {
     Permissions.DRIVERS_READ, Permissions.DRIVERS_EDIT,
     Permissions.TRIPS_READ, Permissions.TRIPS_CREATE, Permissions.TRIPS_DISPATCH, Permissions.TRIPS_COMPLETE, Permissions.TRIPS_CANCEL,
     Permissions.FLEET_READ,
+    Permissions.SETTINGS_READ,
   ],
   SAFETY_OFFICER: [
     Permissions.DRIVERS_READ, Permissions.DRIVERS_EDIT, Permissions.DRIVERS_SUSPEND, Permissions.DRIVERS_ACTIVATE,
@@ -71,6 +72,7 @@ export const RolePermissions: Record<string, Permission[]> = {
     Permissions.TRIPS_READ,
     Permissions.DOCUMENTS_READ, Permissions.DOCUMENTS_UPLOAD,
     Permissions.FLEET_READ,
+    Permissions.SETTINGS_READ,
   ],
   FINANCIAL_ANALYST: [
     Permissions.EXPENSES_READ, Permissions.EXPENSES_CREATE,
@@ -80,6 +82,7 @@ export const RolePermissions: Record<string, Permission[]> = {
     Permissions.FLEET_READ,
     Permissions.TRIPS_READ,
     Permissions.MAINTENANCE_READ,
+    Permissions.SETTINGS_READ,
   ],
 };
 

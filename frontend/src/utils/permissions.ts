@@ -73,6 +73,7 @@ const RolePermissionMap: Record<string, Permission[]> = {
     Permissions.DRIVERS_READ, Permissions.DRIVERS_EDIT,
     Permissions.TRIPS_READ, Permissions.TRIPS_CREATE, Permissions.TRIPS_DISPATCH, Permissions.TRIPS_COMPLETE, Permissions.TRIPS_CANCEL,
     Permissions.FLEET_READ,
+    Permissions.SETTINGS_READ,
   ],
   SAFETY_OFFICER: [
     Permissions.DRIVERS_READ, Permissions.DRIVERS_EDIT, Permissions.DRIVERS_SUSPEND, Permissions.DRIVERS_ACTIVATE,
@@ -81,6 +82,7 @@ const RolePermissionMap: Record<string, Permission[]> = {
     Permissions.TRIPS_READ,
     Permissions.DOCUMENTS_READ, Permissions.DOCUMENTS_UPLOAD,
     Permissions.FLEET_READ,
+    Permissions.SETTINGS_READ,
   ],
   FINANCIAL_ANALYST: [
     Permissions.EXPENSES_READ, Permissions.EXPENSES_CREATE,
@@ -90,6 +92,7 @@ const RolePermissionMap: Record<string, Permission[]> = {
     Permissions.FLEET_READ,
     Permissions.TRIPS_READ,
     Permissions.MAINTENANCE_READ,
+    Permissions.SETTINGS_READ,
   ],
 };
 
@@ -124,6 +127,7 @@ export const getSidebarItems = (role: string | undefined): SidebarItem[] => {
       { label: 'Trips', path: '/trips', icon: 'Route', permission: Permissions.TRIPS_READ },
       { label: 'Drivers', path: '/drivers', icon: 'Users', permission: Permissions.DRIVERS_READ },
       { label: 'Vehicles', path: '/vehicles', icon: 'Truck', permission: Permissions.FLEET_READ },
+      { label: 'Settings', path: '/settings', icon: 'Settings', permission: Permissions.SETTINGS_READ },
     ],
     SAFETY_OFFICER: [
       { label: 'Dashboard', path: '/dashboard', icon: 'LayoutDashboard', permission: Permissions.DRIVERS_READ },
@@ -131,6 +135,7 @@ export const getSidebarItems = (role: string | undefined): SidebarItem[] => {
       { label: 'Compliance', path: '/compliance', icon: 'Shield', permission: Permissions.COMPLIANCE_READ },
       { label: 'Trips', path: '/trips', icon: 'Route', permission: Permissions.TRIPS_READ },
       { label: 'Vehicles', path: '/vehicles', icon: 'Truck', permission: Permissions.FLEET_READ },
+      { label: 'Settings', path: '/settings', icon: 'Settings', permission: Permissions.SETTINGS_READ },
     ],
     FINANCIAL_ANALYST: [
       { label: 'Dashboard', path: '/dashboard', icon: 'LayoutDashboard', permission: Permissions.EXPENSES_READ },
@@ -138,6 +143,7 @@ export const getSidebarItems = (role: string | undefined): SidebarItem[] => {
       { label: 'Expenses', path: '/expenses', icon: 'Receipt', permission: Permissions.EXPENSES_READ },
       { label: 'Reports', path: '/reports', icon: 'BarChart3', permission: Permissions.REPORTS_READ },
       { label: 'Analytics', path: '/analytics', icon: 'TrendingUp', permission: Permissions.ANALYTICS_READ },
+      { label: 'Settings', path: '/settings', icon: 'Settings', permission: Permissions.SETTINGS_READ },
     ],
   };
   if (!role || !items[role]) return [];
