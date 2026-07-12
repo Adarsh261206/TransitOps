@@ -4,13 +4,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Truck, Eye, EyeOff, AlertCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 export function LoginPage() {
-  const [form, setForm] = useState({ email: '', password: '', role: 'FLEET_MANAGER', rememberMe: false });
+  const [form, setForm] = useState({ email: '', password: '', rememberMe: false });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -77,16 +75,6 @@ export function LoginPage() {
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
-              <Select id="role" value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
-                <option value="FLEET_MANAGER">Fleet Manager</option>
-                <option value="DRIVER">Driver</option>
-                <option value="SAFETY_OFFICER">Safety Officer</option>
-                <option value="FINANCIAL_ANALYST">Financial Analyst</option>
-              </Select>
             </div>
 
             <div className="flex items-center justify-between">

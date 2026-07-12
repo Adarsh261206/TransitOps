@@ -10,7 +10,7 @@ import { motion } from 'framer-motion';
 import { Truck, Route, Users, Clock, PlayCircle, Plus, UserPlus, ArrowUpRight, Loader2 } from 'lucide-react';
 
 interface DispatcherDashboardData {
-  todayTrips: number;
+  todayTripsCount: number;
   pendingDispatch: number;
   inProgress: number;
   availableVehicles: number;
@@ -24,12 +24,6 @@ interface DispatcherDashboardData {
     status: 'DRAFT' | 'DISPATCHED' | 'COMPLETED' | 'CANCELLED';
     createdAt: string;
   }>;
-  statusOverview: {
-    DRAFT: number;
-    DISPATCHED: number;
-    COMPLETED: number;
-    CANCELLED: number;
-  };
 }
 
 export function DispatcherDashboard() {
@@ -81,8 +75,17 @@ export function DispatcherDashboard() {
 
   if (!data) return null;
 
+  const tripStatusCounts = {
+    DRAFT: data.recentTrips.filter(t => t.status === 'DRAFT').length,
+    DISPATCHED: data.recentTrips.filter(t => t.status === 'DISPATCHED').length,
+    COMPLETED: data.recentTrips.filter(t => t.status === 'COMPLETED').length,
+    CANCELLED: data.recentTrips.filter(t => t.status === 'CANCELLED').length,
+    ...(data.pendingDispatch > 0 && !data.recentTrips.some(t => t.status === 'DRAFT') ? { DRAFT: data.pendingDispatch } : {}),
+    ...(data.inProgress > 0 && !data.recentTrips.some(t => t.status === 'DISPATCHED') ? { DISPATCHED: data.inProgress } : {}),
+  };
+
   const kpiCards = [
-    { label: "Today's Trips", value: data.todayTrips, icon: Route, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/20' },
+    { label: "Today's Trips", value: data.todayTripsCount, icon: Route, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/20' },
     { label: 'Pending Dispatch', value: data.pendingDispatch, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/20' },
     { label: 'In Progress', value: data.inProgress, icon: PlayCircle, color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/20' },
     { label: 'Available Vehicles', value: data.availableVehicles, icon: Truck, color: 'text-cyan-600', bg: 'bg-cyan-100 dark:bg-cyan-900/20' },
@@ -90,10 +93,10 @@ export function DispatcherDashboard() {
   ];
 
   const barData = [
-    { name: 'Draft', count: data.statusOverview.DRAFT },
-    { name: 'Dispatched', count: data.statusOverview.DISPATCHED },
-    { name: 'Completed', count: data.statusOverview.COMPLETED },
-    { name: 'Cancelled', count: data.statusOverview.CANCELLED },
+    { name: 'Draft', count: tripStatusCounts.DRAFT },
+    { name: 'Dispatched', count: tripStatusCounts.DISPATCHED },
+    { name: 'Completed', count: tripStatusCounts.COMPLETED },
+    { name: 'Cancelled', count: tripStatusCounts.CANCELLED },
   ];
 
   return (
@@ -165,29 +168,29 @@ export function DispatcherDashboard() {
                   <div className="h-3 w-3 rounded-full bg-amber-400" />
                   <span className="text-sm">Draft</span>
                 </div>
-                <span className="text-lg font-bold">{data.statusOverview.DRAFT}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="h-3 w-3 rounded-full bg-blue-500" />
-                  <span className="text-sm">Dispatched</span>
-                </div>
-                <span className="text-lg font-bold">{data.statusOverview.DISPATCHED}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="h-3 w-3 rounded-full bg-green-500" />
-                  <span className="text-sm">Completed</span>
-                </div>
-                <span className="text-lg font-bold">{data.statusOverview.COMPLETED}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="h-3 w-3 rounded-full bg-gray-400" />
-                  <span className="text-sm">Cancelled</span>
-                </div>
-                <span className="text-lg font-bold">{data.statusOverview.CANCELLED}</span>
-              </div>
+                    <span className="text-lg font-bold">{tripStatusCounts.DRAFT}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="h-3 w-3 rounded-full bg-blue-500" />
+                      <span className="text-sm">Dispatched</span>
+                    </div>
+                    <span className="text-lg font-bold">{tripStatusCounts.DISPATCHED}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="h-3 w-3 rounded-full bg-green-500" />
+                      <span className="text-sm">Completed</span>
+                    </div>
+                    <span className="text-lg font-bold">{tripStatusCounts.COMPLETED}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="h-3 w-3 rounded-full bg-gray-400" />
+                      <span className="text-sm">Cancelled</span>
+                    </div>
+                    <span className="text-lg font-bold">{tripStatusCounts.CANCELLED}</span>
+                  </div>
             </div>
           </CardContent>
         </Card>

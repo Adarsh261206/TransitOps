@@ -10,6 +10,7 @@ async function main() {
   const password = await bcrypt.hash('password123', 10);
   const users = await Promise.all([
     prisma.user.upsert({ where: { email: 'fleet@transitops.com' }, update: {}, create: { email: 'fleet@transitops.com', password, name: 'John Fleet', role: Role.FLEET_MANAGER } }),
+    prisma.user.upsert({ where: { email: 'dispatcher@transitops.com' }, update: {}, create: { email: 'dispatcher@transitops.com', password, name: 'David Dispatch', role: Role.DISPATCHER } }),
     prisma.user.upsert({ where: { email: 'driver@transitops.com' }, update: {}, create: { email: 'driver@transitops.com', password, name: 'Sarah Driver', role: Role.DRIVER } }),
     prisma.user.upsert({ where: { email: 'safety@transitops.com' }, update: {}, create: { email: 'safety@transitops.com', password, name: 'Mike Safety', role: Role.SAFETY_OFFICER } }),
     prisma.user.upsert({ where: { email: 'finance@transitops.com' }, update: {}, create: { email: 'finance@transitops.com', password, name: 'Emma Finance', role: Role.FINANCIAL_ANALYST } }),

@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import api from '@/services/api';
-import type { DashboardKPIs } from '@/types';
 import { Breadcrumbs } from '@/components/shared/Breadcrumbs';
 import { PageTransition } from '@/components/shared/PageTransition';
 import { KPISkeleton } from '@/components/shared/Skeletons';
@@ -9,46 +8,60 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
-import {
-  Truck, Wrench, Route, CheckCircle, Clock, Activity, BarChart3
-} from 'lucide-react';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Truck, Wrench, Route, Activity, Users, Clock, PlusCircle, CalendarPlus } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermission } from '@/components/auth/PermissionGuard';
+import { Permissions } from '@/utils/permissions';
+
+interface FleetManagerData {
+  fleetUtilization: number;
+  totalVehicles: number;
+  availableVehicles: number;
+  inShopVehicles: number;
+  onTripVehicles: number;
+  maintenanceDue: number;
+  totalDrivers: number;
+  activeTrips: number;
+  recentMaintenance: Array<{
+    id: string;
+    description: string;
+    type: string;
+    status: string;
+    date: string;
+    vehicle: { name: string; registrationNumber: string };
+  }>;
+}
 
 const COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#6b7280'];
 
 export default function FleetManagerDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { can } = usePermission();
 
-  const { data: kpis, isLoading } = useQuery<DashboardKPIs>({
-    queryKey: ['dashboard-kpis'],
-    queryFn: async () => { const res = await api.get('/dashboard/kpis'); return res.data; },
+  const { data, isLoading } = useQuery<FleetManagerData>({
+    queryKey: ['fleet-manager-dashboard'],
+    queryFn: async () => { const res = await api.get('/dashboard/fleet-manager'); return res.data; },
     refetchInterval: 30000,
   });
 
   if (isLoading) return <PageTransition><KPISkeleton /></PageTransition>;
 
   const kpiCards = [
-    { label: 'Active Vehicles', value: kpis?.activeVehicles ?? 0, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/20', href: '/vehicles?status=ON_TRIP' },
-    { label: 'Available Vehicles', value: kpis?.availableVehicles ?? 0, icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/20', href: '/vehicles?status=AVAILABLE' },
-    { label: 'In Maintenance', value: kpis?.inShopVehicles ?? 0, icon: Wrench, color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/20', href: '/vehicles?status=IN_SHOP' },
-    { label: 'Active Trips', value: kpis?.activeTrips ?? 0, icon: Route, color: 'text-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/20', href: '/trips?status=DISPATCHED' },
-    { label: 'Pending Trips', value: kpis?.pendingTrips ?? 0, icon: Clock, color: 'text-orange-600', bg: 'bg-orange-100 dark:bg-orange-900/20', href: '/trips?status=DRAFT' },
-    { label: 'Fleet Utilization', value: `${kpis?.fleetUtilization ?? 0}%`, icon: Activity, color: 'text-rose-600', bg: 'bg-rose-100 dark:bg-rose-900/20', href: '/reports' },
+    { label: 'Total Vehicles', value: data?.totalVehicles ?? 0, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/20', href: '/vehicles' },
+    { label: 'Available', value: data?.availableVehicles ?? 0, icon: Activity, color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/20', href: '/vehicles?status=AVAILABLE' },
+    { label: 'In Shop', value: data?.inShopVehicles ?? 0, icon: Wrench, color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/20', href: '/vehicles?status=IN_SHOP' },
+    { label: 'On Trip', value: data?.onTripVehicles ?? 0, icon: Route, color: 'text-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/20', href: '/vehicles?status=ON_TRIP' },
+    { label: 'Maintenance Due', value: data?.maintenanceDue ?? 0, icon: Clock, color: 'text-orange-600', bg: 'bg-orange-100 dark:bg-orange-900/20', href: '/maintenance' },
+    { label: 'Fleet Utilization', value: `${data?.fleetUtilization ?? 0}%`, icon: Users, color: 'text-rose-600', bg: 'bg-rose-100 dark:bg-rose-900/20', href: '/reports' },
   ];
 
   const pieData = [
-    { name: 'Available', value: kpis?.availableVehicles ?? 0 },
-    { name: 'On Trip', value: kpis?.activeVehicles ?? 0 },
-    { name: 'In Shop', value: kpis?.inShopVehicles ?? 0 },
-    { name: 'Retired', value: kpis?.retiredVehicles ?? 0 },
-  ];
-
-  const barData = [
-    { name: 'Fuel', cost: kpis?.totalFuelCost ?? 0 },
-    { name: 'Maintenance', cost: kpis?.totalMaintenanceCost ?? 0 },
-    { name: 'Other', cost: kpis?.totalOtherExpenses ?? 0 },
+    { name: 'Available', value: data?.availableVehicles ?? 0 },
+    { name: 'On Trip', value: data?.onTripVehicles ?? 0 },
+    { name: 'In Shop', value: data?.inShopVehicles ?? 0 },
+    { name: 'Others', value: Math.max(0, (data?.totalVehicles ?? 0) - (data?.availableVehicles ?? 0) - (data?.onTripVehicles ?? 0) - (data?.inShopVehicles ?? 0)) },
   ];
 
   return (
@@ -106,22 +119,94 @@ export default function FleetManagerDashboard() {
                 </PieChart>
               </ResponsiveContainer>
             </div>
+            <div className="flex justify-center gap-4 mt-4">
+              {pieData.map((d, i) => (
+                <div key={d.name} className="flex items-center gap-1 text-xs">
+                  <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLORS[i] }} />
+                  {d.name}
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-lg">Cost Breakdown</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">Recent Maintenance</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">Latest maintenance activities</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => navigate('/maintenance')}>View All</Button>
+          </CardHeader>
           <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip />
-                  <Bar dataKey="cost" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+            {data?.recentMaintenance && data.recentMaintenance.length > 0 ? (
+              <div className="space-y-3">
+                {data.recentMaintenance.map((m) => (
+                  <div key={m.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                    <div>
+                      <p className="text-sm font-medium">{m.description}</p>
+                      <p className="text-xs text-muted-foreground">{m.vehicle.name} · {m.vehicle.registrationNumber}</p>
+                    </div>
+                    <Badge variant={m.status === 'ACTIVE' ? 'destructive' : 'default'} className="text-[10px]">{m.status}</Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-sm text-muted-foreground">No maintenance records.</div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2 mb-8">
+        <Card>
+          <CardHeader><CardTitle className="text-lg">Quick Actions</CardTitle></CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
+              {can(Permissions.FLEET_CREATE) && (
+                <Button variant="outline" className="h-auto py-4 flex-col gap-1" onClick={() => navigate('/vehicles?action=create')}>
+                  <PlusCircle className="h-5 w-5" />
+                  <span className="text-xs font-normal">Add Vehicle</span>
+                </Button>
+              )}
+              {can(Permissions.MAINTENANCE_CREATE) && (
+                <Button variant="outline" className="h-auto py-4 flex-col gap-1" onClick={() => navigate('/maintenance?action=create')}>
+                  <CalendarPlus className="h-5 w-5" />
+                  <span className="text-xs font-normal">Schedule Maintenance</span>
+                </Button>
+              )}
+              <Button variant="outline" className="h-auto py-4 flex-col gap-1" onClick={() => navigate('/vehicles')}>
+                <Truck className="h-5 w-5" />
+                <span className="text-xs font-normal">View Fleet</span>
+              </Button>
+              <Button variant="outline" className="h-auto py-4 flex-col gap-1" onClick={() => navigate('/maintenance')}>
+                <Wrench className="h-5 w-5" />
+                <span className="text-xs font-normal">Maintenance</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-lg">Fleet Summary</CardTitle></CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <span className="text-sm">Total Vehicles</span>
+                <span className="text-lg font-bold">{data?.totalVehicles ?? 0}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <span className="text-sm">Active Drivers</span>
+                <span className="text-lg font-bold">{data?.totalDrivers ?? 0}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <span className="text-sm">Active Trips</span>
+                <span className="text-lg font-bold">{data?.activeTrips ?? 0}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <span className="text-sm">Fleet Utilization</span>
+                <span className="text-lg font-bold">{data?.fleetUtilization ?? 0}%</span>
+              </div>
             </div>
           </CardContent>
         </Card>

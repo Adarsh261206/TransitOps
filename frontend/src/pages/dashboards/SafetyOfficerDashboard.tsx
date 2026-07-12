@@ -29,8 +29,8 @@ interface SafetyOfficerKPIs {
   totalDrivers: number;
   expiredLicenses: number;
   suspendedDrivers: number;
-  averageSafetyScore: number;
-  compliancePercentage: number;
+  avgSafetyScore: number;
+  complianceRate: number;
   drivers: DriverCompliance[];
 }
 
@@ -65,8 +65,8 @@ export function SafetyOfficerDashboard() {
     { label: 'Total Drivers', value: kpis?.totalDrivers ?? 0, icon: Users, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/20', href: '/drivers' },
     { label: 'Expired Licenses', value: kpis?.expiredLicenses ?? 0, icon: IdCard, color: 'text-red-600', bg: 'bg-red-100 dark:bg-red-900/20', href: '/drivers?status=EXPIRED' },
     { label: 'Suspended', value: kpis?.suspendedDrivers ?? 0, icon: Ban, color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/20', href: '/drivers?status=SUSPENDED' },
-    { label: 'Avg Safety Score', value: kpis?.averageSafetyScore?.toFixed(1) ?? '0.0', icon: Shield, color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/20', href: '/reports' },
-    { label: 'Compliance %', value: `${kpis?.compliancePercentage ?? 0}%`, icon: Percent, color: 'text-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/20', href: '/reports' },
+    { label: 'Avg Safety Score', value: kpis?.avgSafetyScore?.toFixed(1) ?? '0.0', icon: Shield, color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/20', href: '/reports' },
+    { label: 'Compliance %', value: `${kpis?.complianceRate ?? 0}%`, icon: Percent, color: 'text-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/20', href: '/reports' },
   ];
 
   const scoreDistributionData = [
@@ -204,7 +204,7 @@ export function SafetyOfficerDashboard() {
                     <p className="text-xs text-muted-foreground">Percentage of compliant drivers</p>
                   </div>
                 </div>
-                <span className="text-xl font-bold">{kpis?.compliancePercentage ?? 0}%</span>
+                <span className="text-xl font-bold">{kpis?.complianceRate ?? 0}%</span>
               </div>
             </div>
           </CardContent>
