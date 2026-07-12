@@ -3,6 +3,8 @@ export interface User {
   email: string;
   name: string;
   role: 'FLEET_MANAGER' | 'DISPATCHER' | 'DRIVER' | 'SAFETY_OFFICER' | 'FINANCIAL_ANALYST';
+  isVerified?: boolean;
+  status?: 'ACTIVE' | 'DISABLED' | 'SUSPENDED';
   createdAt?: string;
 }
 
@@ -21,8 +23,16 @@ export interface Vehicle {
   owner?: string;
   insuranceExpiry?: string;
   pucExpiry?: string;
-  status: 'AVAILABLE' | 'ON_TRIP' | 'IN_SHOP' | 'RETIRED';
+  permitExpiry?: string;
+  fitnessExpiry?: string;
+  status: 'AVAILABLE' | 'ON_TRIP' | 'IN_SHOP' | 'RESERVED' | 'INACTIVE' | 'RETIRED';
   region: string | null;
+  currentDriverId?: string;
+  currentTripId?: string;
+  currentLocation?: string;
+  lastFuelDate?: string;
+  lastMaintenanceDate?: string;
+  fuelAverage?: number;
   metadata?: any;
   createdAt: string;
   updatedAt: string;
@@ -30,6 +40,8 @@ export interface Vehicle {
   maintenanceLogs?: MaintenanceLog[];
   fuelLogs?: FuelLog[];
   expenses?: Expense[];
+  documents?: VehicleDocument[];
+  auditLogs?: AuditLog[];
 }
 
 export interface Driver {
@@ -38,15 +50,25 @@ export interface Driver {
   licenseNumber: string;
   licenseCategory: string;
   licenseExpiryDate: string;
+  medicalExpiryDate?: string;
+  insuranceExpiry?: string;
+  policeVerification?: boolean;
   contactNumber: string;
   emergencyContact?: string;
   emergencyPhone?: string;
+  address?: string;
   safetyScore: number;
-  status: 'AVAILABLE' | 'ON_TRIP' | 'OFF_DUTY' | 'SUSPENDED';
+  totalTrips?: number;
+  totalDistance?: number;
+  averageRating?: number;
+  violations?: number;
+  fuelEfficiency?: number;
+  status: 'AVAILABLE' | 'ON_TRIP' | 'OFF_DUTY' | 'LEAVE' | 'SUSPENDED' | 'INACTIVE' | 'EXPIRED_LICENSE';
   metadata?: any;
   createdAt: string;
   updatedAt: string;
   trips?: Trip[];
+  auditLogs?: AuditLog[];
 }
 
 export interface Trip {
@@ -64,8 +86,9 @@ export interface Trip {
   finalOdometer: number | null;
   revenue: number | null;
   toll?: number | null;
+  expenses?: number | null;
   remarks?: string | null;
-  status: 'DRAFT' | 'DISPATCHED' | 'COMPLETED' | 'CANCELLED';
+  status: 'DRAFT' | 'ASSIGNED' | 'DISPATCHED' | 'REACHED' | 'DELIVERED' | 'COMPLETED' | 'CANCELLED';
   createdAt: string;
   updatedAt: string;
   vehicleId: string;
@@ -74,17 +97,19 @@ export interface Trip {
   driver?: { id: string; name: string; status?: string };
   createdById: string;
   createdBy?: { id: string; name: string; email: string };
+  auditLogs?: AuditLog[];
 }
 
 export interface MaintenanceLog {
   id: string;
   description: string;
-  type: string;
+  type: 'Oil' | 'Brake' | 'Engine' | 'Tyre' | 'Battery' | 'AC' | 'Insurance' | 'Fitness' | 'General Service' | 'Repair';
   cost: number;
   actualCost?: number;
   date: string;
   expectedCompletion?: string;
-  priority?: string;
+  completedDate?: string;
+  priority: 'Low' | 'Medium' | 'High' | 'Critical';
   vendor?: string;
   status: 'ACTIVE' | 'CLOSED';
   invoiceUrl?: string;
@@ -92,6 +117,7 @@ export interface MaintenanceLog {
   updatedAt: string;
   vehicleId: string;
   vehicle?: { id: string; name: string; registrationNumber: string; status?: string };
+  auditLogs?: AuditLog[];
 }
 
 export interface FuelLog {
@@ -99,44 +125,105 @@ export interface FuelLog {
   liters: number;
   cost: number;
   date: string;
+  mileage?: number;
+  vehicleId: string;
+  driverId?: string;
+  tripId?: string;
+  vehicle?: { id: string; name: string; registrationNumber: string };
   createdAt: string;
   updatedAt: string;
-  vehicleId: string;
-  vehicle?: { id: string; name: string; registrationNumber: string };
 }
 
 export interface Expense {
   id: string;
-  type: 'TOLL' | 'MAINTENANCE' | 'FUEL' | 'OTHER';
+  type: 'FUEL' | 'REPAIR' | 'TOLL' | 'SALARY' | 'INSURANCE' | 'FINE' | 'PARKING' | 'OTHER';
   amount: number;
   date: string;
   description: string | null;
+  category?: string;
+  receiptUrl?: string;
+  vehicleId: string;
+  tripId?: string;
+  vehicle?: { id: string; name: string; registrationNumber: string };
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  module?: string;
+  link?: string;
+  read: boolean;
+  userId?: string;
+  createdAt: string;
+}
+
+export interface AuditLog {
+  id: string;
+  action: string;
+  entity: string;
+  entityId?: string;
+  description?: string;
+  oldValue?: any;
+  newValue?: any;
+  userId?: string;
+  user?: { name: string; email: string };
+  vehicleId?: string;
+  driverId?: string;
+  tripId?: string;
+  maintenanceId?: string;
+  createdAt: string;
+}
+
+export interface VehicleDocument {
+  id: string;
+  name: string;
+  fileUrl: string;
+  type: string;
+  expiryDate?: string;
   vehicleId: string;
-  vehicle?: { id: string; name: string; registrationNumber: string };
+  createdAt: string;
 }
 
 export interface DashboardKPIs {
-  totalVehicles: number;
-  activeVehicles: number;
-  availableVehicles: number;
-  inShopVehicles: number;
-  retiredVehicles: number;
-  totalDrivers: number;
-  availableDrivers: number;
-  onTripDrivers: number;
-  offDutyDrivers: number;
-  suspendedDrivers: number;
-  activeTrips: number;
-  pendingTrips: number;
-  completedTrips: number;
-  cancelledTrips: number;
-  fleetUtilization: number;
-  totalFuelCost: number;
-  totalMaintenanceCost: number;
-  totalOtherExpenses: number;
-  recentTrips: Trip[];
+  totalVehicles?: number;
+  availableVehicles?: number;
+  inShopVehicles?: number;
+  onTripVehicles?: number;
+  reservedVehicles?: number;
+  retiredVehicles?: number;
+  availableDrivers?: number;
+  totalDrivers?: number;
+  activeTrips?: number;
+  maintenanceDue?: number;
+  pendingApprovals?: number;
+  unreadNotifications?: number;
+  fleetUtilization?: number;
+  todayTripsCount?: number;
+  pendingDispatch?: number;
+  inProgress?: number;
+  completed?: number;
+  cancelled?: number;
+  recentTrips?: Trip[];
+  recentMaintenance?: MaintenanceLog[];
+  totalFuelCost?: number;
+  totalMaintenanceCost?: number;
+  totalOtherExpenses?: number;
+  totalRevenue?: number;
+  totalDistance?: number;
+  totalOperationalCost?: number;
+  roi?: number;
+  expenseByType?: { type: string; _sum: { amount: number } }[];
+  monthlyFuel?: FuelLog[];
+  monthlyExpenses?: Expense[];
+  monthlyTrips?: Trip[];
+  expiredLicenses?: number;
+  suspendedDrivers?: number;
+  avgSafetyScore?: number;
+  complianceRate?: number;
 }
 
 export interface PaginatedResponse<T> {

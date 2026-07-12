@@ -2,13 +2,15 @@ import { Response } from 'express';
 import { prisma } from '../index.js';
 import { AuthRequest } from '../middleware/auth.js';
 import { expenseSchema } from '../utils/validation.js';
+import { createAuditLog } from '../services/audit.js';
 
 export async function getExpenses(req: AuthRequest, res: Response) {
   try {
-    const { vehicleId, type, page = '1', limit = '50' } = req.query;
+    const { vehicleId, type, category, page = '1', limit = '50' } = req.query;
     const where: any = {};
     if (vehicleId) where.vehicleId = vehicleId;
     if (type) where.type = type;
+    if (category) where.category = category;
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
     const [expenses, total] = await Promise.all([
@@ -41,6 +43,9 @@ export async function createExpense(req: AuthRequest, res: Response) {
     if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' });
 
     const expense = await prisma.expense.create({ data: { ...data, date: new Date(data.date) } });
+    
+    await createAuditLog({ action: 'Expense Added', entity: 'Expense', entityId: expense.id, description: `${data.type} expense of $${data.amount} for ${vehicle.name}`, userId: req.user!.id, vehicleId: data.vehicleId });
+
     res.status(201).json(expense);
   } catch (err: any) {
     if (err.issues) return res.status(400).json({ error: 'Validation error', details: err.issues });

@@ -6,7 +6,6 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Seeding database...');
 
-  // Create users
   const password = await bcrypt.hash('password123', 10);
   const users = await Promise.all([
     prisma.user.upsert({ where: { email: 'fleet@transitops.com' }, update: {}, create: { email: 'fleet@transitops.com', password, name: 'John Fleet', role: Role.FLEET_MANAGER } }),
@@ -17,105 +16,58 @@ async function main() {
   ]);
   console.log(`Created ${users.length} users`);
 
-  // Create vehicles
   const vehicles = await Promise.all([
     prisma.vehicle.upsert({
       where: { registrationNumber: 'TRK-001' },
       update: {},
-      create: { registrationNumber: 'TRK-001', name: 'Volvo FH16', type: 'Truck', maxLoadCapacity: 25000, odometer: 45000, acquisitionCost: 150000, region: 'North' },
+      create: { registrationNumber: 'TRK-001', name: 'Volvo FH16', type: 'Truck', maxLoadCapacity: 25000, odometer: 45000, acquisitionCost: 150000, region: 'North', manufacturer: 'Volvo', model: 'FH16', fuelType: 'Diesel', insuranceExpiry: new Date('2027-06-30'), pucExpiry: new Date('2026-12-31'), fitnessExpiry: new Date('2027-03-15'), fuelAverage: 4.5 },
     }),
     prisma.vehicle.upsert({
       where: { registrationNumber: 'VAN-002' },
       update: {},
-      create: { registrationNumber: 'VAN-002', name: 'Ford Transit', type: 'Van', maxLoadCapacity: 1200, odometer: 28000, acquisitionCost: 35000, region: 'South' },
+      create: { registrationNumber: 'VAN-002', name: 'Ford Transit', type: 'Van', maxLoadCapacity: 1200, odometer: 28000, acquisitionCost: 35000, region: 'South', manufacturer: 'Ford', model: 'Transit', fuelType: 'Diesel', insuranceExpiry: new Date('2026-09-30'), pucExpiry: new Date('2026-08-15'), fuelAverage: 8.2 },
     }),
     prisma.vehicle.upsert({
       where: { registrationNumber: 'TRK-003' },
       update: {},
-      create: { registrationNumber: 'TRK-003', name: 'Scania R500', type: 'Truck', maxLoadCapacity: 30000, odometer: 62000, acquisitionCost: 180000, region: 'East' },
+      create: { registrationNumber: 'TRK-003', name: 'Scania R500', type: 'Truck', maxLoadCapacity: 30000, odometer: 62000, acquisitionCost: 180000, region: 'East', manufacturer: 'Scania', model: 'R500', fuelType: 'Diesel', insuranceExpiry: new Date('2027-12-31'), pucExpiry: new Date('2026-11-30'), fuelAverage: 3.8 },
     }),
     prisma.vehicle.upsert({
       where: { registrationNumber: 'VAN-004' },
       update: {},
-      create: { registrationNumber: 'VAN-004', name: 'Mercedes Sprinter', type: 'Van', maxLoadCapacity: 1500, odometer: 15000, acquisitionCost: 42000, region: 'West' },
+      create: { registrationNumber: 'VAN-004', name: 'Mercedes Sprinter', type: 'Van', maxLoadCapacity: 1500, odometer: 15000, acquisitionCost: 42000, region: 'West', manufacturer: 'Mercedes', model: 'Sprinter', fuelType: 'Diesel', insuranceExpiry: new Date('2027-05-31'), pucExpiry: new Date('2026-10-20'), fuelAverage: 9.1 },
     }),
     prisma.vehicle.upsert({
       where: { registrationNumber: 'TRK-005' },
       update: {},
-      create: { registrationNumber: 'TRK-005', name: 'DAF XF', type: 'Truck', maxLoadCapacity: 20000, odometer: 89000, acquisitionCost: 120000, region: 'North', status: 'IN_SHOP' },
+      create: { registrationNumber: 'TRK-005', name: 'DAF XF', type: 'Truck', maxLoadCapacity: 20000, odometer: 89000, acquisitionCost: 120000, region: 'North', manufacturer: 'DAF', model: 'XF', fuelType: 'Diesel', status: 'IN_SHOP', insuranceExpiry: new Date('2026-08-31'), pucExpiry: new Date('2026-07-15'), fuelAverage: 4.2 },
     }),
   ]);
   console.log(`Created ${vehicles.length} vehicles`);
 
-  // Create drivers
   const drivers = await Promise.all([
     prisma.driver.upsert({
       where: { licenseNumber: 'LIC-001' },
       update: {},
-      create: { name: 'Alex Johnson', licenseNumber: 'LIC-001', licenseCategory: 'Class A', licenseExpiryDate: new Date('2027-12-31'), contactNumber: '+1-555-0101', safetyScore: 9.2 },
+      create: { name: 'Alex Johnson', licenseNumber: 'LIC-001', licenseCategory: 'Class A', licenseExpiryDate: new Date('2027-12-31'), medicalExpiryDate: new Date('2027-06-30'), contactNumber: '+1-555-0101', emergencyContact: 'Emma Johnson', emergencyPhone: '+1-555-0109', safetyScore: 9.2, totalTrips: 45, totalDistance: 12500, averageRating: 4.8, violations: 1, fuelEfficiency: 4.7 },
     }),
     prisma.driver.upsert({
       where: { licenseNumber: 'LIC-002' },
       update: {},
-      create: { name: 'Maria Garcia', licenseNumber: 'LIC-002', licenseCategory: 'Class B', licenseExpiryDate: new Date('2026-06-30'), contactNumber: '+1-555-0102', safetyScore: 8.7 },
+      create: { name: 'Maria Garcia', licenseNumber: 'LIC-002', licenseCategory: 'Class B', licenseExpiryDate: new Date('2026-06-30'), medicalExpiryDate: new Date('2026-04-15'), contactNumber: '+1-555-0102', emergencyContact: 'Carlos Garcia', emergencyPhone: '+1-555-0110', safetyScore: 8.7, totalTrips: 32, totalDistance: 8900, averageRating: 4.5, violations: 2, fuelEfficiency: 6.1 },
     }),
     prisma.driver.upsert({
       where: { licenseNumber: 'LIC-003' },
       update: {},
-      create: { name: 'James Wilson', licenseNumber: 'LIC-003', licenseCategory: 'Class A', licenseExpiryDate: new Date('2028-03-15'), contactNumber: '+1-555-0103', safetyScore: 7.5, status: 'SUSPENDED' },
+      create: { name: 'James Wilson', licenseNumber: 'LIC-003', licenseCategory: 'Class A', licenseExpiryDate: new Date('2028-03-15'), medicalExpiryDate: new Date('2027-09-30'), contactNumber: '+1-555-0103', emergencyContact: 'Lisa Wilson', emergencyPhone: '+1-555-0111', safetyScore: 7.5, totalTrips: 28, totalDistance: 7200, averageRating: 4.0, violations: 5, status: 'SUSPENDED' },
     }),
     prisma.driver.upsert({
       where: { licenseNumber: 'LIC-004' },
       update: {},
-      create: { name: 'Emily Brown', licenseNumber: 'LIC-004', licenseCategory: 'Class C', licenseExpiryDate: new Date('2026-11-20'), contactNumber: '+1-555-0104', safetyScore: 9.8 },
+      create: { name: 'Emily Brown', licenseNumber: 'LIC-004', licenseCategory: 'Class C', licenseExpiryDate: new Date('2026-11-20'), medicalExpiryDate: new Date('2026-08-31'), contactNumber: '+1-555-0104', emergencyContact: 'Tom Brown', emergencyPhone: '+1-555-0112', safetyScore: 9.8, totalTrips: 52, totalDistance: 15800, averageRating: 4.9, violations: 0, fuelEfficiency: 5.3 },
     }),
   ]);
   console.log(`Created ${drivers.length} drivers`);
-
-  // Create some trips
-  const trip1 = await prisma.trip.create({
-    data: {
-      source: 'Warehouse A - NYC',
-      destination: 'Distribution Center - Boston',
-      cargoWeight: 18000,
-      plannedDistance: 215,
-      actualDistance: 220,
-      fuelConsumed: 65,
-      finalOdometer: 45220,
-      revenue: 4500,
-      status: 'COMPLETED',
-      vehicleId: vehicles[0].id,
-      driverId: drivers[0].id,
-      createdById: users[0].id,
-    },
-  });
-  console.log('Created sample trips');
-
-  // Create maintenance
-  await prisma.maintenanceLog.create({
-    data: {
-      vehicleId: vehicles[4].id,
-      description: 'Oil Change & Filter Replacement',
-      type: 'Preventive',
-      cost: 350,
-      date: new Date(),
-      status: 'ACTIVE',
-    },
-  });
-  console.log('Created sample maintenance');
-
-  // Create fuel logs
-  await prisma.fuelLog.create({
-    data: { vehicleId: vehicles[0].id, liters: 120, cost: 480, date: new Date('2026-07-10') },
-  });
-  await prisma.fuelLog.create({
-    data: { vehicleId: vehicles[1].id, liters: 45, cost: 180, date: new Date('2026-07-11') },
-  });
-
-  // Create expenses
-  await prisma.expense.create({
-    data: { vehicleId: vehicles[0].id, type: 'TOLL', amount: 45, date: new Date('2026-07-10'), description: 'Highway toll NYC-Boston' },
-  });
 
   console.log('Seeding complete!');
 }

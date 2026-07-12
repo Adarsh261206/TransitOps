@@ -21,7 +21,7 @@ import { usePermission } from '../../components/auth/PermissionGuard';
 import { validateRequired, validateNumber, validateDateString, type FieldError } from '../../utils/validation';
 
 const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  DRAFT: 'outline', DISPATCHED: 'secondary', COMPLETED: 'default', CANCELLED: 'destructive',
+  DRAFT: 'outline', ASSIGNED: 'secondary', DISPATCHED: 'secondary', REACHED: 'default', DELIVERED: 'default', COMPLETED: 'default', CANCELLED: 'destructive',
 };
 
 export function TripsPage() {
@@ -78,7 +78,10 @@ export function TripsPage() {
         <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="w-40">
           <option value="">All Trips</option>
           <option value="DRAFT">Draft</option>
+          <option value="ASSIGNED">Assigned</option>
           <option value="DISPATCHED">Dispatched</option>
+          <option value="REACHED">Reached</option>
+          <option value="DELIVERED">Delivered</option>
           <option value="COMPLETED">Completed</option>
           <option value="CANCELLED">Cancelled</option>
         </Select>
@@ -87,7 +90,7 @@ export function TripsPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
         {[
           { label: 'Draft', count: draftTrips.length, color: 'text-gray-600', bg: 'bg-gray-100 dark:bg-gray-800' },
-          { label: 'Active', count: activeTrips.length, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/20' },
+          { label: 'Active', count: trips.filter(t => t.status === 'DISPATCHED' || t.status === 'ASSIGNED' || t.status === 'REACHED' || t.status === 'DELIVERED').length, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/20' },
           { label: 'Completed', count: completedTrips.length, color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/20' },
           { label: 'Cancelled', count: cancelledTrips.length, color: 'text-red-600', bg: 'bg-red-100 dark:bg-red-900/20' },
         ].map((item, i) => (
@@ -124,20 +127,35 @@ export function TripsPage() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Badge variant={statusColors[trip.status]}>{trip.status}</Badge>
-                      {trip.status === 'DRAFT' && can('trips:dispatch') && (
+                      {trip.status === 'DRAFT' && can('trips:assign') && (
+                        <Button size="sm" variant="outline" onClick={() => mutateStatus.mutate({ id: trip.id, status: 'ASSIGNED' })}>
+                          <Send className="h-3 w-3 mr-1" /> Assign
+                        </Button>
+                      )}
+                      {trip.status === 'ASSIGNED' && can('trips:dispatch') && (
                         <Button size="sm" variant="outline" onClick={() => mutateStatus.mutate({ id: trip.id, status: 'DISPATCHED' })}>
                           <Send className="h-3 w-3 mr-1" /> Dispatch
                         </Button>
                       )}
-                      {trip.status === 'DISPATCHED' && (
-                        <>
-                          {can('trips:complete') && <Button size="sm" variant="default" onClick={() => setSelectedTrip(trip)}>
-                            <CheckCircle className="h-3 w-3 mr-1" /> Complete
-                          </Button>}
-                          {can('trips:cancel') && <Button size="sm" variant="destructive" onClick={() => mutateStatus.mutate({ id: trip.id, status: 'CANCELLED' })}>
-                            <XCircle className="h-3 w-3 mr-1" /> Cancel
-                          </Button>}
-                        </>
+                      {trip.status === 'DISPATCHED' && can('trips:dispatch') && (
+                        <Button size="sm" variant="outline" onClick={() => mutateStatus.mutate({ id: trip.id, status: 'REACHED' })}>
+                          <CheckCircle className="h-3 w-3 mr-1" /> Mark Reached
+                        </Button>
+                      )}
+                      {trip.status === 'REACHED' && can('trips:dispatch') && (
+                        <Button size="sm" variant="outline" onClick={() => mutateStatus.mutate({ id: trip.id, status: 'DELIVERED' })}>
+                          <CheckCircle className="h-3 w-3 mr-1" /> Mark Delivered
+                        </Button>
+                      )}
+                      {trip.status === 'DELIVERED' && can('trips:complete') && (
+                        <Button size="sm" variant="default" onClick={() => setSelectedTrip(trip)}>
+                          <CheckCircle className="h-3 w-3 mr-1" /> Complete
+                        </Button>
+                      )}
+                      {(trip.status === 'DRAFT' || trip.status === 'ASSIGNED' || trip.status === 'DISPATCHED') && can('trips:cancel') && (
+                        <Button size="sm" variant="destructive" onClick={() => mutateStatus.mutate({ id: trip.id, status: 'CANCELLED' })}>
+                          <XCircle className="h-3 w-3 mr-1" /> Cancel
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -148,7 +166,7 @@ export function TripsPage() {
         </div>
       )}
 
-      {selectedTrip && selectedTrip.status === 'DISPATCHED' && (
+      {selectedTrip && (selectedTrip.status === 'DELIVERED' || selectedTrip.status === 'DISPATCHED') && (
         <CompleteTripDialog trip={selectedTrip} onSubmit={(data) => mutateStatus.mutate({ id: selectedTrip.id, status: 'COMPLETED', data })} onClose={() => setSelectedTrip(null)} loading={mutateStatus.isPending} />
       )}
 
@@ -283,7 +301,12 @@ function TripWizard({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
     try {
       const createRes = await api.post('/trips', form);
       const tripId = createRes.data.data?.id || createRes.data.id;
-      await api.patch(`/trips/${tripId}/status`, { status: 'DISPATCHED' });
+      try {
+        await api.patch(`/trips/${tripId}/status`, { status: 'ASSIGNED' });
+      } catch {
+        await api.delete(`/trips/${tripId}`).catch(() => {});
+        throw new Error('Failed to assign trip. Created trip was removed.');
+      }
       onSuccess();
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to create trip';
@@ -417,12 +440,21 @@ function TripWizard({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
 }
 
 function CompleteTripDialog({ trip, onSubmit, onClose, loading }: { trip: Trip; onSubmit: (data: any) => void; onClose: () => void; loading: boolean }) {
-  const [form, setForm] = useState({ actualDistance: 0, fuelConsumed: 0, finalOdometer: 0, revenue: trip.revenue || 0, toll: 0, remarks: '' });
+  const [form, setForm] = useState({ actualDistance: trip.plannedDistance || 0, fuelConsumed: 0, finalOdometer: 0, revenue: trip.revenue || 0, toll: 0, remarks: '' });
   const [completeErrors, setCompleteErrors] = useState<FieldError[]>([]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: FieldError[] = [];
+    if (form.actualDistance < 1) {
+      newErrors.push({ field: 'actualDistance', message: 'Actual distance must be at least 1 km' });
+    }
+    if (form.fuelConsumed < 0) {
+      newErrors.push({ field: 'fuelConsumed', message: 'Fuel consumed must be a positive number' });
+    }
+    if (form.finalOdometer < 0) {
+      newErrors.push({ field: 'finalOdometer', message: 'Final odometer must be a positive number' });
+    }
     if (form.toll < 0) {
       newErrors.push({ field: 'toll', message: 'Toll must be a positive number' });
     }

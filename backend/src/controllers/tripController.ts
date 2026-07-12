@@ -1,7 +1,32 @@
 import { Response } from 'express';
 import { prisma } from '../index.js';
 import { AuthRequest } from '../middleware/auth.js';
-import { tripSchema, tripCompletionSchema } from '../utils/validation.js';
+import { tripSchema, tripStatusSchema, tripCompletionSchema } from '../utils/validation.js';
+import { createAuditLog } from '../services/audit.js';
+import { createNotification } from '../services/notification.js';
+import { sendEmail } from '../services/email.js';
+import { tripNotificationTemplate } from '../services/emailTemplates.js';
+
+// Helper: get all fleet managers + safety officers emails for trip notifications
+async function getTripNotifyRecipients() {
+  return prisma.user.findMany({
+    where: { role: { in: ['FLEET_MANAGER', 'DISPATCHER'] }, isVerified: true, status: 'ACTIVE' },
+    select: { name: true, email: true },
+  });
+}
+
+async function sendTripEmails(opts: Parameters<typeof tripNotificationTemplate>[0]) {
+  const recipients = await getTripNotifyRecipients();
+  for (const r of recipients) {
+    sendEmail({
+      to: r.email,
+      subject: `Trip ${opts.event} — ${opts.source} → ${opts.destination}`,
+      html: tripNotificationTemplate({ ...opts, recipientName: r.name }),
+      template: `trip_${opts.event.toLowerCase()}`,
+      metadata: { tripId: opts.tripId },
+    }).catch(() => {});
+  }
+}
 
 export async function getTrips(req: AuthRequest, res: Response) {
   try {
@@ -32,7 +57,12 @@ export async function getTrip(req: AuthRequest, res: Response) {
   try {
     const trip = await prisma.trip.findUnique({
       where: { id: req.params.id },
-      include: { vehicle: true, driver: true, createdBy: { select: { id: true, name: true, email: true } } },
+      include: {
+        vehicle: true,
+        driver: true,
+        createdBy: { select: { id: true, name: true, email: true } },
+        auditLogs: { orderBy: { createdAt: 'desc' }, take: 20 },
+      },
     });
     if (!trip) return res.status(404).json({ error: 'Trip not found' });
     res.json(trip);
@@ -45,29 +75,28 @@ export async function createTrip(req: AuthRequest, res: Response) {
   try {
     const data = tripSchema.parse(req.body);
 
-    // Validate vehicle exists and is available
     const vehicle = await prisma.vehicle.findUnique({ where: { id: data.vehicleId } });
     if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' });
-    if (vehicle.status !== 'AVAILABLE') return res.status(400).json({ error: 'Vehicle is not available for trip' });
+    if (vehicle.status !== 'AVAILABLE' && vehicle.status !== 'RESERVED') {
+      return res.status(400).json({ error: 'Vehicle is not available for trip' });
+    }
 
-    // Validate cargo weight
     if (data.cargoWeight > vehicle.maxLoadCapacity) {
       return res.status(400).json({
         error: `Cargo weight (${data.cargoWeight} kg) exceeds vehicle max load capacity (${vehicle.maxLoadCapacity} kg)`,
       });
     }
 
-    // Validate driver exists and is available
     const driver = await prisma.driver.findUnique({ where: { id: data.driverId } });
     if (!driver) return res.status(404).json({ error: 'Driver not found' });
-    if (driver.status !== 'AVAILABLE') return res.status(400).json({ error: 'Driver is not available' });
-
-    // Check license validity
+    if (driver.status !== 'AVAILABLE') {
+      if (driver.status === 'SUSPENDED') return res.status(400).json({ error: 'Driver is suspended' });
+      if (driver.status === 'EXPIRED_LICENSE') return res.status(400).json({ error: 'Driver license has expired' });
+      if (driver.status === 'ON_TRIP') return res.status(400).json({ error: 'Driver is currently on another trip' });
+      return res.status(400).json({ error: 'Driver is not available' });
+    }
     if (new Date(driver.licenseExpiryDate) < new Date()) {
       return res.status(400).json({ error: 'Driver license has expired' });
-    }
-    if (driver.status === 'SUSPENDED') {
-      return res.status(400).json({ error: 'Driver is suspended' });
     }
 
     const trip = await prisma.trip.create({
@@ -87,7 +116,28 @@ export async function createTrip(req: AuthRequest, res: Response) {
       },
     });
 
-    res.status(201).json(trip);
+    const capacityPercent = ((data.cargoWeight / vehicle.maxLoadCapacity) * 100).toFixed(1);
+    const warnings: string[] = [];
+    if (parseFloat(capacityPercent) > 80) {
+      warnings.push(`Cargo load is at ${capacityPercent}% of vehicle capacity`);
+    }
+
+    await createAuditLog({
+      action: 'Trip Created',
+      entity: 'Trip',
+      entityId: trip.id,
+      description: `Trip from ${trip.source} to ${trip.destination} created`,
+      userId: req.user!.id,
+      tripId: trip.id,
+      vehicleId: data.vehicleId,
+      driverId: data.driverId,
+    });
+
+    res.status(201).json({
+      ...trip,
+      warnings,
+      capacityPercentage: `${capacityPercent}%`,
+    });
   } catch (err: any) {
     if (err.issues) return res.status(400).json({ error: 'Validation error', details: err.issues });
     res.status(500).json({ error: err.message });
@@ -97,7 +147,7 @@ export async function createTrip(req: AuthRequest, res: Response) {
 export async function updateTripStatus(req: AuthRequest, res: Response) {
   try {
     const { id } = req.params;
-    const { status, actualDistance, fuelConsumed, finalOdometer, revenue } = req.body;
+    const data = tripStatusSchema.parse(req.body);
 
     const trip = await prisma.trip.findUnique({
       where: { id },
@@ -105,62 +155,145 @@ export async function updateTripStatus(req: AuthRequest, res: Response) {
     });
     if (!trip) return res.status(404).json({ error: 'Trip not found' });
 
-    switch (status) {
-      case 'DISPATCHED': {
-        if (trip.status !== 'DRAFT') return res.status(400).json({ error: 'Only draft trips can be dispatched' });
-
-        // Re-validate vehicle and driver availability
+    switch (data.status) {
+      case 'ASSIGNED': {
+        if (trip.status !== 'DRAFT') return res.status(400).json({ error: 'Only draft trips can be assigned' });
         const vehicle = await prisma.vehicle.findUnique({ where: { id: trip.vehicleId } });
         const driver = await prisma.driver.findUnique({ where: { id: trip.driverId } });
-        if (!vehicle || vehicle.status !== 'AVAILABLE') return res.status(400).json({ error: 'Vehicle is no longer available' });
-        if (!driver || driver.status !== 'AVAILABLE') return res.status(400).json({ error: 'Driver is no longer available' });
+        if (!vehicle || (vehicle.status !== 'AVAILABLE' && vehicle.status !== 'RESERVED')) return res.status(400).json({ error: 'Vehicle is not available' });
+        if (!driver || driver.status !== 'AVAILABLE') return res.status(400).json({ error: 'Driver is not available' });
 
+        await prisma.$transaction([
+          prisma.trip.update({ where: { id }, data: { status: 'ASSIGNED' } }),
+          prisma.vehicle.update({ where: { id: trip.vehicleId }, data: { status: 'RESERVED', currentTripId: id, currentDriverId: trip.driverId } }),
+          prisma.driver.update({ where: { id: trip.driverId }, data: { status: 'ON_TRIP' } }),
+        ]);
+
+        sendTripEmails({ event: 'ASSIGNED', tripId: id, source: trip.source, destination: trip.destination, driverName: trip.driver.name, vehicleName: trip.vehicle.name, vehicleReg: trip.vehicle.registrationNumber, recipientName: '' });
+        break;
+      }
+      case 'DISPATCHED': {
+        if (trip.status !== 'ASSIGNED') return res.status(400).json({ error: 'Only assigned trips can be dispatched' });
         await prisma.$transaction([
           prisma.trip.update({ where: { id }, data: { status: 'DISPATCHED' } }),
           prisma.vehicle.update({ where: { id: trip.vehicleId }, data: { status: 'ON_TRIP' } }),
-          prisma.driver.update({ where: { id: trip.driverId }, data: { status: 'ON_TRIP' } }),
         ]);
+
+        // Get dispatcher name
+        const dispatcher = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { name: true } });
+        sendTripEmails({ event: 'DISPATCHED', tripId: id, source: trip.source, destination: trip.destination, driverName: trip.driver.name, vehicleName: trip.vehicle.name, vehicleReg: trip.vehicle.registrationNumber, dispatchedBy: dispatcher?.name, recipientName: '' });
+        break;
+      }
+      case 'REACHED': {
+        if (trip.status !== 'DISPATCHED') return res.status(400).json({ error: 'Only dispatched trips can mark reached' });
+        await prisma.trip.update({ where: { id }, data: { status: 'REACHED' } });
+        break;
+      }
+      case 'DELIVERED': {
+        if (trip.status !== 'REACHED') return res.status(400).json({ error: 'Only reached trips can be delivered' });
+        await prisma.trip.update({ where: { id }, data: { status: 'DELIVERED' } });
         break;
       }
       case 'COMPLETED': {
-        if (trip.status !== 'DISPATCHED') return res.status(400).json({ error: 'Only dispatched trips can be completed' });
+        if (trip.status !== 'DELIVERED' && trip.status !== 'DISPATCHED') {
+          return res.status(400).json({ error: 'Trip must be at least dispatched to complete' });
+        }
 
-        const completionData = tripCompletionSchema.parse({ actualDistance, fuelConsumed, finalOdometer, revenue, toll: req.body.toll, remarks: req.body.remarks });
+        const completionData = tripCompletionSchema.parse(data);
 
-        await prisma.$transaction([
-          prisma.trip.update({
+        await prisma.$transaction(async (tx) => {
+          await tx.trip.update({
             where: { id },
             data: {
               status: 'COMPLETED',
-              actualDistance: completionData.actualDistance,
-              fuelConsumed: completionData.fuelConsumed,
-              finalOdometer: completionData.finalOdometer,
+              actualDistance: completionData.actualDistance ?? trip.actualDistance,
+              fuelConsumed: completionData.fuelConsumed ?? trip.fuelConsumed,
+              finalOdometer: completionData.finalOdometer ?? trip.finalOdometer,
               revenue: completionData.revenue ?? trip.revenue,
-              toll: completionData.toll,
-              remarks: completionData.remarks,
+              toll: completionData.toll ?? trip.toll,
+              expenses: completionData.expenses ?? trip.expenses,
+              remarks: completionData.remarks ?? trip.remarks,
             },
-          }),
-          // Create expense for toll if provided
-          ...(completionData.toll ? [prisma.expense.create({ data: { vehicleId: trip.vehicleId, type: 'TOLL', amount: completionData.toll, date: new Date(), description: 'Toll for trip' } })] : []),
-          prisma.vehicle.update({ where: { id: trip.vehicleId }, data: { status: 'AVAILABLE', odometer: completionData.finalOdometer } }),
-          prisma.driver.update({ where: { id: trip.driverId }, data: { status: 'AVAILABLE' } }),
-        ]);
+          });
+
+          const vehicleUpdateData: any = { status: 'AVAILABLE' };
+          if (completionData.finalOdometer) vehicleUpdateData.odometer = completionData.finalOdometer;
+          await tx.vehicle.update({ where: { id: trip.vehicleId }, data: vehicleUpdateData });
+
+          await tx.driver.update({ where: { id: trip.driverId }, data: { status: 'AVAILABLE' } });
+
+          if (completionData.toll) {
+            await tx.expense.create({
+              data: {
+                vehicleId: trip.vehicleId,
+                type: 'TOLL',
+                amount: completionData.toll,
+                date: new Date(),
+                description: 'Toll for trip',
+                tripId: id,
+              },
+            });
+          }
+          if (completionData.fuelConsumed) {
+            await tx.fuelLog.create({
+              data: {
+                vehicleId: trip.vehicleId,
+                liters: completionData.fuelConsumed,
+                cost: 0,
+                date: new Date(),
+                tripId: id,
+                driverId: trip.driverId,
+              },
+            });
+          }
+        });
+
+        sendTripEmails({ event: 'COMPLETED', tripId: id, source: trip.source, destination: trip.destination, driverName: trip.driver.name, vehicleName: trip.vehicle.name, vehicleReg: trip.vehicle.registrationNumber, recipientName: '' });
         break;
       }
       case 'CANCELLED': {
-        if (trip.status !== 'DISPATCHED' && trip.status !== 'DRAFT') {
-          return res.status(400).json({ error: 'Only draft or dispatched trips can be cancelled' });
+        if (trip.status === 'COMPLETED' || trip.status === 'CANCELLED') {
+          return res.status(400).json({ error: 'Cannot cancel a completed or already cancelled trip' });
         }
-
         await prisma.$transaction([
-          prisma.trip.update({ where: { id }, data: { status: 'CANCELLED' } }),
-          prisma.vehicle.update({ where: { id: trip.vehicleId }, data: { status: 'AVAILABLE' } }),
+          prisma.trip.update({ where: { id }, data: { status: 'CANCELLED', remarks: data.remarks ?? trip.remarks } }),
+          prisma.vehicle.update({ where: { id: trip.vehicleId }, data: { status: 'AVAILABLE', currentTripId: null, currentDriverId: null } }),
           prisma.driver.update({ where: { id: trip.driverId }, data: { status: 'AVAILABLE' } }),
         ]);
+
+        sendTripEmails({ event: 'CANCELLED', tripId: id, source: trip.source, destination: trip.destination, driverName: trip.driver.name, vehicleName: trip.vehicle.name, vehicleReg: trip.vehicle.registrationNumber, remarks: data.remarks, recipientName: '' });
         break;
       }
       default:
         return res.status(400).json({ error: 'Invalid status transition' });
+    }
+
+    await createAuditLog({
+      action: `Trip ${data.status}`,
+      entity: 'Trip',
+      entityId: id,
+      description: `Trip status changed to ${data.status}`,
+      userId: req.user!.id,
+      tripId: id,
+    });
+
+    if (data.status === 'CANCELLED') {
+      await createNotification({
+        title: 'Trip Cancelled',
+        message: `Trip from ${trip.source} to ${trip.destination} has been cancelled`,
+        type: 'warning',
+        module: 'Trip',
+        link: `/trips/${id}`,
+      });
+    }
+    if (data.status === 'COMPLETED') {
+      await createNotification({
+        title: 'Trip Completed',
+        message: `Trip from ${trip.source} to ${trip.destination} has been completed`,
+        type: 'success',
+        module: 'Trip',
+        link: `/trips/${id}`,
+      });
     }
 
     const updated = await prisma.trip.findUnique({
@@ -178,7 +311,9 @@ export async function deleteTrip(req: AuthRequest, res: Response) {
   try {
     const trip = await prisma.trip.findUnique({ where: { id: req.params.id } });
     if (!trip) return res.status(404).json({ error: 'Trip not found' });
-    if (trip.status === 'DISPATCHED') return res.status(400).json({ error: 'Cannot delete a dispatched trip. Cancel it first.' });
+    if (['DISPATCHED', 'REACHED', 'DELIVERED', 'COMPLETED'].includes(trip.status)) {
+      return res.status(400).json({ error: 'Cannot delete a trip that has been dispatched, delivered, or completed' });
+    }
 
     await prisma.trip.delete({ where: { id: req.params.id } });
     res.json({ message: 'Trip deleted' });

@@ -5,14 +5,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
-import { Truck, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Truck, Eye, EyeOff, AlertCircle, Mail, CheckCircle } from 'lucide-react';
+import api from '@/services/api';
 
 export function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '', rememberMe: false });
   const [error, setError] = useState('');
+  const [errorCode, setErrorCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [attempts, setAttempts] = useState(0);
+  const [resendEmail, setResendEmail] = useState('');
+  const [resending, setResending] = useState(false);
+  const [resent, setResent] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -23,15 +28,36 @@ export function LoginPage() {
       return;
     }
     setError('');
+    setErrorCode('');
+    setResent(false);
     setLoading(true);
     try {
       await login(form.email, form.password);
       navigate('/dashboard');
     } catch (err: any) {
-      setAttempts(a => a + 1);
-      setError(err.response?.data?.error || 'Invalid email or password. Please try again.');
+      const code = err.response?.data?.code ?? '';
+      const message = err.response?.data?.error ?? 'Invalid email or password. Please try again.';
+      setErrorCode(code);
+      setError(message);
+      if (code === 'EMAIL_NOT_VERIFIED') {
+        setResendEmail(err.response?.data?.email ?? form.email);
+      } else {
+        setAttempts(a => a + 1);
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      await api.post('/auth/resend-verification', { email: resendEmail });
+      setResent(true);
+    } catch {
+      // silently ignore — user can try again
+    } finally {
+      setResending(false);
     }
   };
 
@@ -86,9 +112,31 @@ export function LoginPage() {
             </div>
 
             {error && (
-              <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 dark:bg-red-950 p-3 text-sm text-red-700 dark:text-red-300">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                {error}
+              <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-950 p-3 text-sm text-red-700 dark:text-red-300 space-y-2">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  {error}
+                </div>
+                {errorCode === 'EMAIL_NOT_VERIFIED' && (
+                  <div className="pt-1 border-t border-red-200 dark:border-red-800">
+                    {resent ? (
+                      <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                        <CheckCircle className="h-4 w-4" />
+                        Verification email sent — check your inbox
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleResend}
+                        disabled={resending}
+                        className="flex items-center gap-2 text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-red-100 font-medium underline-offset-2 hover:underline"
+                      >
+                        <Mail className="h-3.5 w-3.5" />
+                        {resending ? 'Sending…' : 'Resend verification email'}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

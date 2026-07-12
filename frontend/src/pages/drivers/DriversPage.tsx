@@ -14,14 +14,15 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
-import { Plus, Search, Pencil, Trash2, Eye, ArrowLeft, Phone, Award, CalendarDays, IdCard, AlertTriangle, Route, ChevronRight } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Eye, ArrowLeft, Phone, Award, CalendarDays, IdCard, AlertTriangle, Route, ChevronRight, History } from 'lucide-react';
 import { useToast } from '@/components/shared/Toast';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
+import { StatusChangeCard } from '@/components/shared/StatusChangeCard';
 import { usePermission } from '../../components/auth/PermissionGuard';
 import { validateRequired, validateNumber, validateDateString, type FieldError } from '../../utils/validation';
 
 const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  AVAILABLE: 'default', ON_TRIP: 'secondary', OFF_DUTY: 'outline', SUSPENDED: 'destructive',
+  AVAILABLE: 'default', ON_TRIP: 'secondary', OFF_DUTY: 'outline', LEAVE: 'outline', SUSPENDED: 'destructive', INACTIVE: 'outline', EXPIRED_LICENSE: 'destructive',
 };
 
 export function DriversPage() {
@@ -66,6 +67,7 @@ export function DriversPage() {
     { key: 'safetyScore', header: 'Safety Score', render: (d: Driver) => (
       <span className={d.safetyScore >= 8 ? 'text-green-600' : d.safetyScore >= 5 ? 'text-amber-600' : 'text-red-600'}>{d.safetyScore}/10</span>
     )},
+    { key: 'totalTrips', header: 'Trips', render: (d: Driver) => d.totalTrips || 0 },
     { key: 'status', header: 'Status', render: (d: Driver) => <Badge variant={statusColors[d.status]}>{d.status.replace('_', ' ')}</Badge> },
     { key: 'actions', header: 'Actions', render: (d: Driver) => (
       <div className="flex gap-1" onClick={e => e.stopPropagation()}>
@@ -96,12 +98,15 @@ export function DriversPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search by name or license..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="w-36">
+        <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="w-44">
           <option value="">All Status</option>
           <option value="AVAILABLE">Available</option>
           <option value="ON_TRIP">On Trip</option>
           <option value="OFF_DUTY">Off Duty</option>
+          <option value="LEAVE">Leave</option>
           <option value="SUSPENDED">Suspended</option>
+          <option value="INACTIVE">Inactive</option>
+          <option value="EXPIRED_LICENSE">Expired License</option>
         </Select>
       </div>
 
@@ -155,10 +160,14 @@ function DriverProfilePage({ driver, onBack }: { driver: Driver; onBack: () => v
               <div><span className="text-muted-foreground">Category</span><p className="font-medium">{fullDriver.licenseCategory}</p></div>
               <div><span className="text-muted-foreground">Expiry</span><p className={`font-medium ${expired ? 'text-destructive' : ''}`}>{expired ? '⚠ EXPIRED' : new Date(fullDriver.licenseExpiryDate).toLocaleDateString()}</p></div>
               <div><span className="text-muted-foreground">Contact</span><p className="font-medium">{fullDriver.contactNumber}</p></div>
+              {fullDriver.medicalExpiryDate && <div><span className="text-muted-foreground">Medical Expiry</span><p className={`font-medium ${new Date(fullDriver.medicalExpiryDate) < new Date() ? 'text-destructive' : ''}`}>{new Date(fullDriver.medicalExpiryDate).toLocaleDateString()}</p></div>}
               <div><span className="text-muted-foreground">Safety Score</span><p className="font-medium text-lg">{fullDriver.safetyScore}/10</p></div>
               {fullDriver.emergencyContact && (
                 <div className="col-span-2"><span className="text-muted-foreground">Emergency Contact</span><p className="font-medium">{fullDriver.emergencyContact}{fullDriver.emergencyPhone ? ` (${fullDriver.emergencyPhone})` : ''}</p></div>
               )}
+              <div className="col-span-2 pt-2">
+                <StatusChangeCard entity="driver" id={fullDriver.id} currentStatus={fullDriver.status} />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -193,6 +202,21 @@ function DriverProfilePage({ driver, onBack }: { driver: Driver; onBack: () => v
               </div>
             </CardContent>
           </Card>
+          {fullDriver.auditLogs && fullDriver.auditLogs.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle className="text-sm font-medium flex items-center gap-2"><History className="h-4 w-4" /> Activity Timeline</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {fullDriver.auditLogs.map(log => (
+                    <div key={log.id} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
+                      <div><span className="font-medium">{log.action}</span><p className="text-xs text-muted-foreground">{log.description}</p></div>
+                      <span className="text-xs text-muted-foreground">{new Date(log.createdAt).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </PageTransition>

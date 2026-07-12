@@ -2,14 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import authRoutes from './routes/auth.js';
-import vehicleRoutes from './routes/vehicles.js';
-import driverRoutes from './routes/drivers.js';
-import tripRoutes from './routes/trips.js';
-import maintenanceRoutes from './routes/maintenance.js';
-import fuelLogRoutes from './routes/fuelLogs.js';
-import expenseRoutes from './routes/expenses.js';
-import reportRoutes from './routes/reports.js';
-import dashboardRoutes from './routes/dashboard.js';
+import apiRoutes from './routes/index.js';
+import { startScheduler } from './jobs/scheduler.js';
 
 export const prisma = new PrismaClient();
 
@@ -19,20 +13,14 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-app.use('/api/auth', authRoutes);
-app.use('/api/vehicles', vehicleRoutes);
-app.use('/api/drivers', driverRoutes);
-app.use('/api/trips', tripRoutes);
-app.use('/api/maintenance', maintenanceRoutes);
-app.use('/api/fuel-logs', fuelLogRoutes);
-app.use('/api/expenses', expenseRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+app.use('/api/auth', authRoutes);
+app.use('/api', apiRoutes);
+
 app.listen(PORT, () => {
   console.log(`TransitOps API running on port ${PORT}`);
+  startScheduler();
 });

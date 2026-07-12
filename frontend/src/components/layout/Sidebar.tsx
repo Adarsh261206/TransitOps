@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Truck, Users, Route, Wrench, Fuel,
-  BarChart3, Settings, ChevronLeft, Receipt, TrendingUp, Shield
+  BarChart3, Settings, ChevronLeft, Receipt, TrendingUp, Shield, History, AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getSidebarItems } from '@/utils/permissions';
@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 
 const iconMap: Record<string, any> = {
   LayoutDashboard, Truck, Users, Route, Wrench, Fuel,
-  BarChart3, Settings, Receipt, TrendingUp, Shield,
+  BarChart3, Settings, Receipt, TrendingUp, Shield, History, AlertTriangle,
 };
 
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {

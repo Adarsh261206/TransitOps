@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { NotificationDropdown } from '@/components/shared/NotificationDropdown';
 import {
-  Search, Moon, Sun, LogOut, User, ChevronDown,
+  Search, Moon, Sun, LogOut, User, ChevronDown, Settings,
   Menu, PlusCircle, CalendarPlus, UserCheck, ShieldCheck,
   UserX, Fuel, Download, Zap
 } from 'lucide-react';
@@ -110,8 +110,11 @@ export function TopNavbar({ onToggleSidebar }: { onToggleSidebar: () => void }) 
                   <p className="text-xs text-muted-foreground">{user?.email}</p>
                   <Badge variant="secondary" className="mt-1 text-[10px]">{roleLabel}</Badge>
                 </div>
-                <Button variant="ghost" size="sm" className="w-full justify-start text-xs" onClick={() => navigate('/settings')}>
-                  <User className="h-3 w-3 mr-2" /> Settings
+                <Button variant="ghost" size="sm" className="w-full justify-start text-xs" onClick={() => { navigate('/profile'); setShowProfile(false); }}>
+                  <User className="h-3 w-3 mr-2" /> Profile
+                </Button>
+                <Button variant="ghost" size="sm" className="w-full justify-start text-xs" onClick={() => { navigate('/settings'); setShowProfile(false); }}>
+                  <Settings className="h-3 w-3 mr-2" /> Settings
                 </Button>
                 <Button variant="ghost" size="sm" className="w-full justify-start text-xs text-destructive" onClick={logout}>
                   <LogOut className="h-3 w-3 mr-2" /> Logout

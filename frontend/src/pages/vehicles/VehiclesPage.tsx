@@ -16,15 +16,16 @@ import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
+import { StatusChangeCard } from '@/components/shared/StatusChangeCard';
 import { motion } from 'framer-motion';
-import { Plus, Search, Pencil, Trash2, Eye, ArrowLeft, Gauge, Weight, DollarSign, MapPin, Calendar, Fuel, Wrench, Receipt, Route, User, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Eye, ArrowLeft, Gauge, Weight, DollarSign, MapPin, Calendar, Fuel, Wrench, Receipt, Route, User, AlertTriangle, History } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '@/components/shared/Toast';
 import { usePermission } from '../../components/auth/PermissionGuard';
 import { validateRequired, validateNumber, validateDateString, getFieldError, type FieldError } from '../../utils/validation';
 
 const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  AVAILABLE: 'default', ON_TRIP: 'secondary', IN_SHOP: 'destructive', RETIRED: 'outline',
+  AVAILABLE: 'default', ON_TRIP: 'secondary', IN_SHOP: 'destructive', RESERVED: 'secondary', INACTIVE: 'outline', RETIRED: 'outline',
 };
 
 const vehicleTypeOptions = [
@@ -135,11 +136,13 @@ export function VehiclesPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search by name or registration..." className="pl-9" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
         </div>
-        <Select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }} className="w-36">
+        <Select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }} className="w-40">
           <option value="">All Status</option>
           <option value="AVAILABLE">Available</option>
           <option value="ON_TRIP">On Trip</option>
           <option value="IN_SHOP">In Shop</option>
+          <option value="RESERVED">Reserved</option>
+          <option value="INACTIVE">Inactive</option>
           <option value="RETIRED">Retired</option>
         </Select>
         <Select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(1); }} className="w-36">
@@ -180,6 +183,7 @@ function VehicleDetailPage({ vehicle, onBack }: { vehicle: Vehicle; onBack: () =
     queryFn: async () => { const res = await api.get(`/vehicles/${vehicle.id}`); return res.data as Vehicle; },
     initialData: vehicle,
   });
+  const { can } = usePermission();
 
   const currentTrip = fullVehicle.trips?.find(t => t.status === 'DISPATCHED');
 
@@ -207,9 +211,16 @@ function VehicleDetailPage({ vehicle, onBack }: { vehicle: Vehicle; onBack: () =
               {fullVehicle.region && <div><span className="text-muted-foreground">Region</span><p className="font-medium">{fullVehicle.region}</p></div>}
               <div><span className="text-muted-foreground">Insurance Expiry</span><p className="font-medium flex items-center gap-1">{fullVehicle.insuranceExpiry ? new Date(fullVehicle.insuranceExpiry).toLocaleDateString() : 'N/A'} {isExpired(fullVehicle.insuranceExpiry) && <Badge variant="destructive" className="text-[10px] h-4 px-1">Expired</Badge>}</p></div>
               <div><span className="text-muted-foreground">PUC Expiry</span><p className="font-medium flex items-center gap-1">{fullVehicle.pucExpiry ? new Date(fullVehicle.pucExpiry).toLocaleDateString() : 'N/A'} {isExpired(fullVehicle.pucExpiry) && <Badge variant="destructive" className="text-[10px] h-4 px-1">Expired</Badge>}</p></div>
+              {fullVehicle.permitExpiry && <div><span className="text-muted-foreground">Permit Expiry</span><p className="font-medium flex items-center gap-1">{new Date(fullVehicle.permitExpiry).toLocaleDateString()} {isExpired(fullVehicle.permitExpiry) && <Badge variant="destructive" className="text-[10px] h-4 px-1">Expired</Badge>}</p></div>}
+              {fullVehicle.fitnessExpiry && <div><span className="text-muted-foreground">Fitness Expiry</span><p className="font-medium flex items-center gap-1">{new Date(fullVehicle.fitnessExpiry).toLocaleDateString()} {isExpired(fullVehicle.fitnessExpiry) && <Badge variant="destructive" className="text-[10px] h-4 px-1">Expired</Badge>}</p></div>}
+              {fullVehicle.fuelAverage && <div><span className="text-muted-foreground">Fuel Average</span><p className="font-medium">{fullVehicle.fuelAverage.toFixed(1)} km/L</p></div>}
             </div>
           </CardContent>
         </Card>
+
+        {can('fleet:status') && (
+          <StatusChangeCard entity="vehicle" id={fullVehicle.id} currentStatus={fullVehicle.status} />
+        )}
 
         <div className="lg:col-span-2 space-y-6">
           {currentTrip && (
@@ -275,6 +286,21 @@ function VehicleDetailPage({ vehicle, onBack }: { vehicle: Vehicle; onBack: () =
               )) : <p className="text-sm text-muted-foreground">No expenses</p>}
             </CardContent>
           </Card>
+          {fullVehicle.auditLogs && fullVehicle.auditLogs.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle className="text-sm font-medium flex items-center gap-2"><History className="h-4 w-4" /> Activity Timeline</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {fullVehicle.auditLogs.map(log => (
+                    <div key={log.id} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
+                      <div><span className="font-medium">{log.action}</span><p className="text-xs text-muted-foreground">{log.description}</p></div>
+                      <span className="text-xs text-muted-foreground">{new Date(log.createdAt).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </PageTransition>

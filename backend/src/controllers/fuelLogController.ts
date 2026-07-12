@@ -2,12 +2,14 @@ import { Response } from 'express';
 import { prisma } from '../index.js';
 import { AuthRequest } from '../middleware/auth.js';
 import { fuelLogSchema } from '../utils/validation.js';
+import { createAuditLog } from '../services/audit.js';
 
 export async function getFuelLogs(req: AuthRequest, res: Response) {
   try {
-    const { vehicleId, page = '1', limit = '50' } = req.query;
+    const { vehicleId, driverId, page = '1', limit = '50' } = req.query;
     const where: any = {};
     if (vehicleId) where.vehicleId = vehicleId;
+    if (driverId) where.driverId = driverId;
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
     const [logs, total] = await Promise.all([
@@ -39,7 +41,20 @@ export async function createFuelLog(req: AuthRequest, res: Response) {
     const vehicle = await prisma.vehicle.findUnique({ where: { id: data.vehicleId } });
     if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' });
 
-    const log = await prisma.fuelLog.create({ data: { ...data, date: new Date(data.date) } });
+    // Calculate mileage if odometer data available
+    const mileage = data.mileage || (data.liters > 0 ? (data.liters / data.liters) : undefined);
+
+    const log = await prisma.fuelLog.create({ data: { ...data, date: new Date(data.date), mileage } });
+    
+    // Update vehicle fuel average
+    const recentLogs = await prisma.fuelLog.findMany({ where: { vehicleId: data.vehicleId }, orderBy: { date: 'desc' }, take: 5 });
+    if (recentLogs.length > 0) {
+      const avgMileage = recentLogs.filter(l => l.mileage).reduce((s, l) => s + (l.mileage || 0), 0) / recentLogs.filter(l => l.mileage).length;
+      await prisma.vehicle.update({ where: { id: data.vehicleId }, data: { fuelAverage: isNaN(avgMileage) ? undefined : avgMileage, lastFuelDate: new Date(data.date) } });
+    }
+
+    await createAuditLog({ action: 'Fuel Added', entity: 'FuelLog', entityId: log.id, description: `${data.liters}L fuel for ${vehicle.name}`, userId: req.user!.id, vehicleId: data.vehicleId });
+
     res.status(201).json(log);
   } catch (err: any) {
     if (err.issues) return res.status(400).json({ error: 'Validation error', details: err.issues });

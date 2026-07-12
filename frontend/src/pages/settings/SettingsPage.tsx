@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { Breadcrumbs } from '@/components/shared/Breadcrumbs';
 import { PageTransition } from '@/components/shared/PageTransition';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,12 +8,16 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Spinner } from '@/components/ui/spinner';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/shared/Toast';
 import { usePermission } from '@/components/auth/PermissionGuard';
-import { Permissions, getNotificationCategories } from '@/utils/permissions';
+import api from '@/services/api';
+import { Permissions } from '@/utils/permissions';
 import ForbiddenPage from '@/pages/ForbiddenPage';
-import { Building2, Shield, User, Bell } from 'lucide-react';
+import { Building2, Shield, User, Bell, Mail, Users } from 'lucide-react';
+import { EmailCenterTab } from './EmailCenterTab';
+import { UserManagementTab } from './UserManagementTab';
 
 const roles = [
   { value: 'FLEET_MANAGER', label: 'Fleet Manager', permissions: ['Full Access'] },
@@ -48,7 +53,7 @@ const roleNotificationPrefs: Record<string, Array<{ label: string; desc: string 
   ],
 };
 
-type TabKey = 'general' | 'rbac' | 'profile' | 'notifications' | 'appearance';
+type TabKey = 'general' | 'rbac' | 'email' | 'users' | 'profile' | 'notifications';
 
 interface Tab {
   key: TabKey;
@@ -60,12 +65,16 @@ interface Tab {
 const allTabs: Tab[] = [
   { key: 'general', label: 'General', icon: Building2, roles: ['FLEET_MANAGER'] },
   { key: 'rbac', label: 'RBAC', icon: Shield, roles: ['FLEET_MANAGER'] },
+  { key: 'users', label: 'Users', icon: Users, roles: ['FLEET_MANAGER'] },
+  { key: 'email', label: 'Email Center', icon: Mail, roles: ['FLEET_MANAGER'] },
   { key: 'profile', label: 'Profile', icon: User, roles: ['FLEET_MANAGER', 'DISPATCHER', 'SAFETY_OFFICER', 'FINANCIAL_ANALYST'] },
   { key: 'notifications', label: 'Notifications', icon: Bell, roles: ['FLEET_MANAGER', 'DISPATCHER', 'SAFETY_OFFICER', 'FINANCIAL_ANALYST'] },
 ];
 
+interface GeneralSettings { companyName: string; depotLocation: string; currency: string; distanceUnit: string; }
+
 export function SettingsPage() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const { toast } = useToast();
   const { can } = usePermission();
   const role = user?.role ?? '';
@@ -73,11 +82,61 @@ export function SettingsPage() {
   const visibleTabs = allTabs.filter(t => t.roles.includes(role));
   const [activeTab, setActiveTab] = useState<TabKey>(visibleTabs[0]?.key ?? 'profile');
 
+  const [general, setGeneral] = useState<GeneralSettings>(() => {
+    const saved = localStorage.getItem('settings-general');
+    return saved ? JSON.parse(saved) : { companyName: 'TransitOps Corp', depotLocation: 'New York, USA', currency: 'USD', distanceUnit: 'km' };
+  });
+  const [profile, setProfile] = useState({ name: user?.name || '', currentPassword: '', newPassword: '' });
+  const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem('settings-notifications');
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [profileSaving, setProfileSaving] = useState(false);
+
   if (!can(Permissions.SETTINGS_READ)) {
     return <ForbiddenPage />;
   }
 
   const roleLabel = role.replace(/_/g, ' ');
+
+  const saveGeneral = () => {
+    localStorage.setItem('settings-general', JSON.stringify(general));
+    toast('Settings saved', 'success');
+  };
+
+  const saveProfile = async () => {
+    if (!profile.name?.trim()) {
+      toast('Name is required', 'error');
+      return;
+    }
+    setProfileSaving(true);
+    try {
+      const payload: any = { name: profile.name.trim() };
+      if (profile.currentPassword && profile.newPassword) {
+        payload.currentPassword = profile.currentPassword;
+        payload.newPassword = profile.newPassword;
+      } else if (profile.currentPassword || profile.newPassword) {
+        toast('Both current and new password required to change password', 'error');
+        setProfileSaving(false);
+        return;
+      }
+      await api.put('/auth/profile', payload);
+      const updatedUser = { ...user, name: profile.name.trim() } as any;
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setProfile(p => ({ ...p, currentPassword: '', newPassword: '' }));
+      toast('Profile updated', 'success');
+    } catch (err: any) {
+      toast(err.response?.data?.error || 'Failed to update profile', 'error');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const saveNotifPrefs = () => {
+    localStorage.setItem('settings-notifications', JSON.stringify(notifPrefs));
+    toast('Notification preferences saved', 'success');
+  };
 
   return (
     <PageTransition>
@@ -103,12 +162,12 @@ export function SettingsPage() {
           <CardHeader><CardTitle className="text-lg">General Settings</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>Company Name</Label><Input placeholder="TransitOps Corp" defaultValue="TransitOps Corp" /></div>
-              <div className="space-y-2"><Label>Depot / Base Location</Label><Input placeholder="New York, USA" defaultValue="New York, USA" /></div>
-              <div className="space-y-2"><Label>Currency</Label><Select defaultValue="USD"><option value="USD">USD ($)</option><option value="EUR">EUR (€)</option><option value="GBP">GBP (£)</option></Select></div>
-              <div className="space-y-2"><Label>Distance Unit</Label><Select defaultValue="km"><option value="km">Kilometers (km)</option><option value="mi">Miles (mi)</option></Select></div>
+              <div className="space-y-2"><Label>Company Name</Label><Input placeholder="TransitOps Corp" value={general.companyName} onChange={e => setGeneral(g => ({ ...g, companyName: e.target.value }))} /></div>
+              <div className="space-y-2"><Label>Depot / Base Location</Label><Input placeholder="New York, USA" value={general.depotLocation} onChange={e => setGeneral(g => ({ ...g, depotLocation: e.target.value }))} /></div>
+              <div className="space-y-2"><Label>Currency</Label><Select value={general.currency} onChange={e => setGeneral(g => ({ ...g, currency: e.target.value }))}><option value="USD">USD ($)</option><option value="EUR">EUR (€)</option><option value="GBP">GBP (£)</option></Select></div>
+              <div className="space-y-2"><Label>Distance Unit</Label><Select value={general.distanceUnit} onChange={e => setGeneral(g => ({ ...g, distanceUnit: e.target.value }))}><option value="km">Kilometers (km)</option><option value="mi">Miles (mi)</option></Select></div>
             </div>
-            <Button onClick={() => toast('Settings saved', 'success')}>Save Settings</Button>
+            <Button onClick={saveGeneral}>Save Settings</Button>
           </CardContent>
         </Card>
       )}
@@ -157,6 +216,10 @@ export function SettingsPage() {
         </div>
       )}
 
+      {activeTab === 'email' && <EmailCenterTab />}
+
+      {activeTab === 'users' && <UserManagementTab />}
+
       {activeTab === 'profile' && (
         <Card>
           <CardHeader><CardTitle className="text-lg">Profile Settings</CardTitle></CardHeader>
@@ -170,12 +233,12 @@ export function SettingsPage() {
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>Full Name</Label><Input defaultValue={user?.name} /></div>
+              <div className="space-y-2"><Label>Full Name</Label><Input value={profile.name} onChange={e => setProfile(p => ({ ...p, name: e.target.value }))} /></div>
               <div className="space-y-2"><Label>Email</Label><Input defaultValue={user?.email} type="email" disabled className="opacity-60" /></div>
-              <div className="space-y-2"><Label>Current Password</Label><Input type="password" placeholder="Enter current password" /></div>
-              <div className="space-y-2"><Label>New Password</Label><Input type="password" placeholder="Enter new password" /></div>
+              <div className="space-y-2"><Label>Current Password</Label><Input type="password" placeholder="Enter current password" value={profile.currentPassword} onChange={e => setProfile(p => ({ ...p, currentPassword: e.target.value }))} /></div>
+              <div className="space-y-2"><Label>New Password</Label><Input type="password" placeholder="Enter new password" value={profile.newPassword} onChange={e => setProfile(p => ({ ...p, newPassword: e.target.value }))} /></div>
             </div>
-            <Button onClick={() => toast('Profile updated', 'success')}>Update Profile</Button>
+            <Button onClick={saveProfile} disabled={profileSaving}>{profileSaving ? <Spinner /> : 'Update Profile'}</Button>
           </CardContent>
         </Card>
       )}
@@ -190,10 +253,10 @@ export function SettingsPage() {
             {(roleNotificationPrefs[role] ?? []).map(item => (
               <div key={item.label} className="flex items-center justify-between rounded-lg border p-4">
                 <div><p className="text-sm font-medium">{item.label}</p><p className="text-xs text-muted-foreground">{item.desc}</p></div>
-                <input type="checkbox" defaultChecked className="rounded" />
+                <input type="checkbox" checked={notifPrefs[item.label] ?? true} onChange={e => setNotifPrefs(p => ({ ...p, [item.label]: e.target.checked }))} className="rounded" />
               </div>
             ))}
-            <Button onClick={() => toast('Notification preferences saved', 'success')}>Save Preferences</Button>
+            <Button onClick={saveNotifPrefs}>Save Preferences</Button>
           </CardContent>
         </Card>
       )}

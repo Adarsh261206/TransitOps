@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
-import type { FuelLog, Expense, Vehicle } from '@/types';
+import type { FuelLog, Expense, Vehicle, Driver } from '@/types';
 import { Breadcrumbs } from '@/components/shared/Breadcrumbs';
 import { PageTransition } from '@/components/shared/PageTransition';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -31,7 +31,7 @@ export function FuelExpensesPage() {
 
   const { data: fuelData, isLoading: fuelLoading } = useQuery({
     queryKey: ['fuel-logs', vehicleFilter],
-    queryFn: async () => { const params = new URLSearchParams(); if (vehicleFilter) params.append('vehicleId', vehicleFilter); params.append('limit', '100'); const r = await api.get(`/fuel-logs?${params}`); return r.data as { data: FuelLog[] }; },
+    queryFn: async () => { const params = new URLSearchParams(); if (vehicleFilter) params.append('vehicleId', vehicleFilter); params.append('limit', '100'); const r = await api.get(`/fuel?${params}`); return r.data as { data: FuelLog[] }; },
   });
 
   const { data: expenseData, isLoading: expenseLoading } = useQuery({
@@ -147,12 +147,13 @@ export function FuelExpensesPage() {
 }
 
 function FuelForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [form, setForm] = useState({ vehicleId: '', liters: 0, cost: 0, date: new Date().toISOString().split('T')[0], driver: '' });
+  const [form, setForm] = useState({ vehicleId: '', liters: 0, cost: 0, date: new Date().toISOString().split('T')[0], driverId: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<FieldError[]>([]);
   const { toast } = useToast();
   const { data: vehicles } = useQuery({ queryKey: ['vehicles-all'], queryFn: async () => { const r = await api.get('/vehicles?limit=100'); return r.data.data as Vehicle[]; } });
+  const { data: drivers } = useQuery({ queryKey: ['drivers-all'], queryFn: async () => { const r = await api.get('/drivers?limit=100'); return { data: r.data as Driver[] }; } });
 
   function validate() {
     const errs: FieldError[] = [];
@@ -176,7 +177,7 @@ function FuelForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () =
     }
     setLoading(true);
     try {
-      await api.post('/fuel-logs', form);
+      await api.post('/fuel', form);
       toast('Fuel log added', 'success');
       onSuccess();
     } catch (err: any) {
@@ -210,7 +211,15 @@ function FuelForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () =
             </div>
           )}
           <div className="space-y-1"><label className="text-sm font-medium">Date *</label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} required /></div>
-          <div className="space-y-1"><label className="text-sm font-medium">Driver</label><Input value={form.driver} onChange={e => setForm(f => ({ ...f, driver: e.target.value }))} placeholder="Who logged this?" /></div>
+          <div className="space-y-1">
+            <SearchableSelect
+              label="Driver"
+              placeholder="Select driver"
+              options={drivers?.data?.map(d => ({ value: d.id, label: d.name, sublabel: d.licenseNumber })) || []}
+              value={form.driverId}
+              onChange={value => setForm(f => ({ ...f, driverId: value }))}
+            />
+          </div>
           {error && <p className="text-sm text-destructive col-span-2">{error}</p>}
           <div className="flex gap-2 col-span-2"><Button type="submit" disabled={loading}>{loading ? <Spinner /> : 'Add Fuel Record'}</Button><Button type="button" variant="outline" onClick={onClose}>Cancel</Button></div>
         </form>
@@ -220,20 +229,23 @@ function FuelForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () =
 }
 
 function ExpenseForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [form, setForm] = useState({ vehicleId: '', type: 'TOLL', amount: 0, date: new Date().toISOString().split('T')[0], description: '' });
+  const [form, setForm] = useState({ vehicleId: '', type: 'FUEL', amount: 0, date: new Date().toISOString().split('T')[0], description: '', driverId: '', tripId: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<FieldError[]>([]);
   const { toast } = useToast();
   const { data: vehicles } = useQuery({ queryKey: ['vehicles-all'], queryFn: async () => { const r = await api.get('/vehicles?limit=100'); return r.data.data as Vehicle[]; } });
+  const { data: drivers } = useQuery({ queryKey: ['drivers-all'], queryFn: async () => { const r = await api.get('/drivers?limit=100'); return { data: r.data as Driver[] }; } });
 
   const expenseTypes = [
-    { value: 'TOLL', label: 'Toll' },
-    { value: 'PARKING', label: 'Parking' },
-    { value: 'REPAIR', label: 'Repair' },
-    { value: 'INSURANCE', label: 'Insurance' },
-    { value: 'OTHER', label: 'Other' },
     { value: 'FUEL', label: 'Fuel' },
+    { value: 'REPAIR', label: 'Repair' },
+    { value: 'TOLL', label: 'Toll' },
+    { value: 'SALARY', label: 'Salary' },
+    { value: 'INSURANCE', label: 'Insurance' },
+    { value: 'FINE', label: 'Fine' },
+    { value: 'PARKING', label: 'Parking' },
+    { value: 'OTHER', label: 'Other' },
   ];
 
   function validate() {
@@ -298,6 +310,16 @@ function ExpenseForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
           </div>
           <div className="space-y-1"><label className="text-sm font-medium">Amount ($) *</label><Input className={getFieldError(errors, 'amount') ? 'border-destructive' : ''} type="number" step="0.01" value={form.amount || ''} onChange={e => { setForm(f => ({ ...f, amount: Number(e.target.value) })); setErrors(errs => errs.filter(e => e.field !== 'amount')); }} required min={0} />{getFieldError(errors, 'amount') && <p className="text-sm text-destructive">{getFieldError(errors, 'amount')}</p>}</div>
           <div className="space-y-1"><label className="text-sm font-medium">Date *</label><Input className={getFieldError(errors, 'date') ? 'border-destructive' : ''} type="date" value={form.date} onChange={e => { setForm(f => ({ ...f, date: e.target.value })); setErrors(errs => errs.filter(e => e.field !== 'date')); }} required />{getFieldError(errors, 'date') && <p className="text-sm text-destructive">{getFieldError(errors, 'date')}</p>}</div>
+          <div className="space-y-1 sm:col-span-2">
+            <SearchableSelect
+              label="Driver"
+              placeholder="Select driver"
+              options={drivers?.data?.map(d => ({ value: d.id, label: d.name, sublabel: d.licenseNumber })) || []}
+              value={form.driverId}
+              onChange={value => setForm(f => ({ ...f, driverId: value }))}
+            />
+          </div>
+          <div className="space-y-1 sm:col-span-2"><label className="text-sm font-medium">Trip ID</label><Input value={form.tripId} onChange={e => setForm(f => ({ ...f, tripId: e.target.value }))} placeholder="Optional trip reference" /></div>
           <div className="space-y-1 sm:col-span-2"><label className="text-sm font-medium">Description</label><Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g., Highway toll" /></div>
           {error && <p className="text-sm text-destructive col-span-2">{error}</p>}
           <div className="flex gap-2 col-span-2"><Button type="submit" disabled={loading}>{loading ? <Spinner /> : 'Add Expense'}</Button><Button type="button" variant="outline" onClick={onClose}>Cancel</Button></div>

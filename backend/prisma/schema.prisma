@@ -19,6 +19,8 @@ enum VehicleStatus {
   AVAILABLE
   ON_TRIP
   IN_SHOP
+  RESERVED
+  INACTIVE
   RETIRED
 }
 
@@ -26,12 +28,18 @@ enum DriverStatus {
   AVAILABLE
   ON_TRIP
   OFF_DUTY
+  LEAVE
   SUSPENDED
+  INACTIVE
+  EXPIRED_LICENSE
 }
 
 enum TripStatus {
   DRAFT
+  ASSIGNED
   DISPATCHED
+  REACHED
+  DELIVERED
   COMPLETED
   CANCELLED
 }
@@ -42,22 +50,40 @@ enum MaintenanceStatus {
 }
 
 enum ExpenseType {
-  TOLL
-  MAINTENANCE
   FUEL
+  REPAIR
+  TOLL
+  SALARY
+  INSURANCE
+  FINE
+  PARKING
   OTHER
 }
 
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      Role     @default(FLEET_MANAGER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum UserStatus {
+  ACTIVE
+  DISABLED
+  SUSPENDED
+}
 
-  trips     Trip[]
+model User {
+  id          String     @id @default(uuid())
+  email       String     @unique
+  password    String
+  name        String
+  role        Role       @default(FLEET_MANAGER)
+  isVerified  Boolean    @default(false)
+  status      UserStatus @default(ACTIVE)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  trips             Trip[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  reportedIncidents Incident[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens      PasswordResetToken[]
+  emailLogs                EmailLog[]
 }
 
 model Vehicle {
@@ -75,8 +101,16 @@ model Vehicle {
   owner              String?
   insuranceExpiry    DateTime?
   pucExpiry          DateTime?
+  permitExpiry       DateTime?
+  fitnessExpiry      DateTime?
   status             VehicleStatus @default(AVAILABLE)
   region             String?
+  currentDriverId    String?
+  currentTripId      String?
+  currentLocation    String?
+  lastFuelDate       DateTime?
+  lastMaintenanceDate DateTime?
+  fuelAverage        Float?
   metadata           Json?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
@@ -86,51 +120,67 @@ model Vehicle {
   fuelLogs        FuelLog[]
   expenses        Expense[]
   documents       VehicleDocument[]
+  auditLogs       AuditLog[]
+  incidents       Incident[]
 
   @@index([status])
   @@index([type])
   @@index([registrationNumber])
+  @@index([region])
 }
 
 model Driver {
-  id               String       @id @default(uuid())
-  name             String
-  licenseNumber    String       @unique
-  licenseCategory  String
+  id                String       @id @default(uuid())
+  name              String
+  licenseNumber     String       @unique
+  licenseCategory   String
   licenseExpiryDate DateTime
-  contactNumber    String
+  medicalExpiryDate DateTime?
+  insuranceExpiry   DateTime?
+  policeVerification Boolean     @default(false)
+  contactNumber     String
   emergencyContact  String?
   emergencyPhone    String?
-  safetyScore      Float        @default(5.0)
-  status           DriverStatus @default(AVAILABLE)
-  metadata         Json?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  address           String?
+  safetyScore       Float        @default(5.0)
+  totalTrips        Int          @default(0)
+  totalDistance     Float        @default(0)
+  averageRating     Float        @default(5.0)
+  violations        Int          @default(0)
+  fuelEfficiency    Float?
+  status            DriverStatus @default(AVAILABLE)
+  metadata          Json?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
-  trips Trip[]
+  trips     Trip[]
+  auditLogs AuditLog[]
+  incidents Incident[]
 
   @@index([status])
+  @@index([licenseExpiryDate])
 }
 
 model Trip {
-  id             String     @id @default(uuid())
-  source         String
-  destination    String
-  cargoWeight    Float
-  goodsType      String?
-  priority       String?
+  id              String     @id @default(uuid())
+  source          String
+  destination     String
+  cargoWeight     Float
+  goodsType       String?
+  priority        String?
   plannedDistance Float
   estimatedCost   Float?
   estimatedFuel   Float?
   actualDistance  Float?
-  fuelConsumed   Float?
-  finalOdometer  Float?
-  revenue        Float?
-  toll           Float?
-  remarks        String?
-  status         TripStatus @default(DRAFT)
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  fuelConsumed    Float?
+  finalOdometer   Float?
+  revenue         Float?
+  toll            Float?
+  expenses        Float?
+  remarks         String?
+  status          TripStatus @default(DRAFT)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
   vehicleId String
   vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
@@ -141,9 +191,12 @@ model Trip {
   createdById String
   createdBy   User   @relation(fields: [createdById], references: [id])
 
+  auditLogs AuditLog[]
+
   @@index([status])
   @@index([vehicleId])
   @@index([driverId])
+  @@index([createdAt])
 }
 
 model MaintenanceLog {
@@ -154,6 +207,7 @@ model MaintenanceLog {
   actualCost         Float?
   date               DateTime
   expectedCompletion DateTime?
+  completedDate      DateTime?
   priority           String            @default("Medium")
   vendor             String?
   status             MaintenanceStatus @default(ACTIVE)
@@ -165,8 +219,11 @@ model MaintenanceLog {
   vehicleId String
   vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
 
+  auditLogs AuditLog[]
+
   @@index([vehicleId])
   @@index([status])
+  @@index([type])
 }
 
 model FuelLog {
@@ -174,14 +231,14 @@ model FuelLog {
   liters    Float
   cost      Float
   date      DateTime
+  mileage   Float?
+  vehicleId String
+  driverId  String?
+  tripId    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  vehicleId String
-  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
-
-  @@index([vehicleId])
-  @@index([date])
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
 }
 
 model Expense {
@@ -190,11 +247,15 @@ model Expense {
   amount      Float
   date        DateTime
   description String?
+  category    String?
+  receiptUrl  String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
   vehicleId String
   vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+
+  tripId    String?
 
   @@index([vehicleId])
   @@index([type])
@@ -211,20 +272,183 @@ model Notification {
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
   @@index([createdAt])
   @@index([read])
+  @@index([userId])
 }
 
 model VehicleDocument {
-  id        String   @id @default(uuid())
-  name      String
-  fileUrl   String
-  type      String
+  id         String   @id @default(uuid())
+  name       String
+  fileUrl    String
+  type       String
   expiryDate DateTime?
-  createdAt DateTime @default(now())
+  createdAt  DateTime @default(now())
 
   vehicleId String
   vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
 
   @@index([vehicleId])
+}
+
+enum IncidentStatus {
+  REPORTED
+  INVESTIGATING
+  RESOLVED
+  CLOSED
+}
+
+enum IncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Incident {
+  id          String           @id @default(uuid())
+  title       String
+  description String?
+  date        DateTime         @default(now())
+  severity    IncidentSeverity @default(MEDIUM)
+  status      IncidentStatus   @default(REPORTED)
+  location    String?
+  resolvedAt  DateTime?
+  resolution  String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  vehicleId String?
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
+
+  driverId String?
+  driver   Driver?  @relation(fields: [driverId], references: [id])
+
+  reportedById String?
+  reportedBy   User?    @relation(fields: [reportedById], references: [id])
+
+  @@index([status])
+  @@index([severity])
+  @@index([date])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  action     String
+  entity     String
+  entityId   String?
+  description String?
+  oldValue   Json?
+  newValue   Json?
+  createdAt  DateTime @default(now())
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  vehicleId String?
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
+
+  driverId String?
+  driver   Driver?  @relation(fields: [driverId], references: [id])
+
+  tripId String?
+  trip   Trip?     @relation(fields: [tripId], references: [id])
+
+  maintenanceId String?
+  maintenance   MaintenanceLog? @relation(fields: [maintenanceId], references: [id])
+
+  @@index([createdAt])
+  @@index([entity])
+  @@index([entityId])
+  @@index([userId])
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+enum EmailLogStatus {
+  PENDING
+  SENT
+  FAILED
+  OPENED
+}
+
+model EmailLog {
+  id          String         @id @default(uuid())
+  recipient   String
+  subject     String
+  template    String
+  status      EmailLogStatus @default(PENDING)
+  sentAt      DateTime?
+  openedAt    DateTime?
+  failedReason String?
+  retryCount  Int            @default(0)
+  maxRetries  Int            @default(3)
+  metadata    Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([recipient])
+}
+
+model EmailTemplate {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  subject   String
+  body      String
+  enabled   Boolean  @default(true)
+  variables String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model EmailSetting {
+  id            String @id @default("default")
+  provider      String @default("smtp")
+  smtpHost      String?
+  smtpPort      Int?
+  smtpSecure    Boolean @default(true)
+  smtpUser      String?
+  smtpPassword  String?
+  senderName    String @default("TransitOps")
+  senderEmail   String @default("noreply@transitops.com")
+  replyTo       String @default("support@transitops.com")
+  supportEmail  String @default("support@transitops.com")
+  maxRetries    Int    @default(3)
+  retryInterval Int    @default(5)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }

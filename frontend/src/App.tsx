@@ -7,6 +7,9 @@ import { NotificationProvider } from '@/hooks/useNotifications';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { RegisterPage } from '@/pages/auth/RegisterPage';
+import { VerifyEmailPage } from '@/pages/auth/VerifyEmailPage';
+import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
 import FleetManagerDashboard from '@/pages/dashboards/FleetManagerDashboard';
 import { DispatcherDashboard } from '@/pages/dashboards/DispatcherDashboard';
 import { SafetyOfficerDashboard } from '@/pages/dashboards/SafetyOfficerDashboard';
@@ -18,6 +21,10 @@ import { MaintenancePage } from '@/pages/maintenance/MaintenancePage';
 import { FuelExpensesPage } from '@/pages/fuel/FuelExpensesPage';
 import { ReportsPage } from '@/pages/reports/ReportsPage';
 import { SettingsPage } from '@/pages/settings/SettingsPage';
+import { AuditLogPage } from '@/pages/audit/AuditLogPage';
+import { CompliancePage } from '@/pages/compliance/CompliancePage';
+import { IncidentsPage } from '@/pages/incidents/IncidentsPage';
+import { ProfilePage } from '@/pages/profile/ProfilePage';
 import PermissionGuard from './components/auth/PermissionGuard';
 import { Permissions } from './utils/permissions';
 
@@ -48,6 +55,9 @@ function App() {
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
+                <Route path="/verify-email" element={<VerifyEmailPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route element={<MainLayout />}>
                   <Route path="/dashboard" element={<RoleBasedDashboard />} />
                   <Route path="/vehicles" element={<PermissionGuard permission={Permissions.FLEET_READ}><VehiclesPage /></PermissionGuard>} />
@@ -63,6 +73,12 @@ function App() {
                   <Route path="/expenses" element={<Navigate to="/fuel-expenses" replace />} />
                   <Route path="/analytics" element={<Navigate to="/reports" replace />} />
                   <Route path="/reports" element={<PermissionGuard permission={Permissions.REPORTS_READ}><ReportsPage /></PermissionGuard>} />
+                  <Route path="/audit" element={<PermissionGuard permission={Permissions.AUDIT_READ}><AuditLogPage /></PermissionGuard>} />
+                  <Route path="/compliance" element={<PermissionGuard permission={Permissions.COMPLIANCE_READ}><CompliancePage /></PermissionGuard>} />
+                  <Route path="/compliance/:id" element={<PermissionGuard permission={Permissions.COMPLIANCE_READ}><CompliancePage /></PermissionGuard>} />
+                  <Route path="/incidents" element={<PermissionGuard permission={Permissions.INCIDENTS_READ}><IncidentsPage /></PermissionGuard>} />
+                  <Route path="/incidents/:id" element={<PermissionGuard permission={Permissions.INCIDENTS_READ}><IncidentsPage /></PermissionGuard>} />
+                  <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/settings" element={<PermissionGuard permission={Permissions.SETTINGS_READ}><SettingsPage /></PermissionGuard>} />
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />

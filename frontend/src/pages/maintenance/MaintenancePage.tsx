@@ -10,6 +10,7 @@ import { DataTable } from '@/components/shared/DataTable';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { motion } from 'framer-motion';
@@ -19,15 +20,28 @@ import { SearchableSelect } from '@/components/shared/SearchableSelect';
 import { usePermission } from '../../components/auth/PermissionGuard';
 import { validateRequired, validateNumber, validateDateString, type FieldError, getFieldError } from '../../utils/validation';
 
+const maintenanceStatusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  ACTIVE: 'destructive', CLOSED: 'default',
+};
+
 export function MaintenancePage() {
   const [showForm, setShowForm] = useState(false);
+  const [priorityFilter, setPriorityFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { can } = usePermission();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['maintenance'],
-    queryFn: async () => { const res = await api.get('/maintenance?limit=100'); return res.data as { data: MaintenanceLog[] }; },
+    queryKey: ['maintenance', priorityFilter, typeFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (priorityFilter) params.append('priority', priorityFilter);
+      if (typeFilter) params.append('type', typeFilter);
+      params.append('limit', '100');
+      const res = await api.get(`/maintenance?${params}`);
+      return res.data as { data: MaintenanceLog[] };
+    },
   });
 
   const closeMutation = useMutation({
@@ -48,7 +62,7 @@ export function MaintenancePage() {
     { key: 'date', header: 'Date', render: (l: MaintenanceLog) => new Date(l.date).toLocaleDateString() },
     { key: 'status', header: 'Status', render: (l: MaintenanceLog) => (
       <div className="flex items-center gap-2">
-        <Badge variant={l.status === 'ACTIVE' ? 'destructive' : 'default'}>{l.status}</Badge>
+        <Badge variant={maintenanceStatusColors[l.status] || 'default'}>{l.status}</Badge>
         {l.status === 'ACTIVE' && can('maintenance:close') && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => closeMutation.mutate(l.id)}><CheckCircle className="h-3 w-3 mr-1" /> Close</Button>}
       </div>
     )},
@@ -67,6 +81,34 @@ export function MaintenancePage() {
 
       {showForm && <MaintenanceForm onClose={() => setShowForm(false)} onSuccess={() => { setShowForm(false); queryClient.invalidateQueries({ queryKey: ['maintenance'] }); toast('Maintenance logged. Vehicle set to In Shop.', 'success'); }} />}
 
+      <div className="flex flex-wrap gap-3 mb-4">
+        <Select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)} className="w-40">
+          <option value="">All Priorities</option>
+          <option value="Low">Low</option>
+          <option value="Medium">Medium</option>
+          <option value="High">High</option>
+          <option value="Critical">Critical</option>
+        </Select>
+        <Select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="w-44">
+          <option value="">All Types</option>
+          <option value="Oil">Oil Change</option>
+          <option value="Brake">Brake</option>
+          <option value="Engine">Engine</option>
+          <option value="Tyre">Tyre</option>
+          <option value="Battery">Battery</option>
+          <option value="AC">AC</option>
+          <option value="Electrical">Electrical</option>
+          <option value="Transmission">Transmission</option>
+          <option value="Suspension">Suspension</option>
+          <option value="Insurance">Insurance</option>
+          <option value="Fitness">Fitness</option>
+          <option value="General Service">General Service</option>
+          <option value="Repair">Repair</option>
+          <option value="Inspection">Inspection</option>
+          <option value="Other">Other</option>
+        </Select>
+      </div>
+
       {isLoading ? <TableSkeleton rows={5} cols={6} /> : logs.length === 0 ? (
         <EmptyState title="No maintenance records" description="Log your first maintenance record."         action={can('maintenance:create') ? <Button onClick={() => setShowForm(true)}><Plus className="h-4 w-4 mr-2" /> Log Maintenance</Button> : undefined} />
       ) : <DataTable columns={columns} data={logs} />}
@@ -84,7 +126,7 @@ export function MaintenancePage() {
 }
 
 function MaintenanceForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [form, setForm] = useState({ vehicleId: '', description: '', type: 'Oil Change', cost: 0, date: new Date().toISOString().split('T')[0], vendor: '', priority: '', expectedCompletion: '' });
+  const [form, setForm] = useState({ vehicleId: '', description: '', type: 'Oil', cost: 0, date: new Date().toISOString().split('T')[0], vendor: '', priority: '', expectedCompletion: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<FieldError[]>([]);
@@ -161,11 +203,18 @@ function MaintenanceForm({ onClose, onSuccess }: { onClose: () => void; onSucces
               label="Service Type *"
               placeholder="Select type"
               options={[
-                { value: 'Oil Change', label: 'Oil Change' },
-                { value: 'Tyre', label: 'Tyre' },
-                { value: 'Engine', label: 'Engine' },
+                { value: 'Oil', label: 'Oil Change' },
                 { value: 'Brake', label: 'Brake' },
+                { value: 'Engine', label: 'Engine' },
+                { value: 'Tyre', label: 'Tyre' },
+                { value: 'Battery', label: 'Battery' },
+                { value: 'AC', label: 'AC' },
+                { value: 'Electrical', label: 'Electrical' },
+                { value: 'Transmission', label: 'Transmission' },
+                { value: 'Suspension', label: 'Suspension' },
                 { value: 'Insurance', label: 'Insurance' },
+                { value: 'Fitness', label: 'Fitness' },
+                { value: 'General Service', label: 'General Service' },
                 { value: 'Repair', label: 'Repair' },
                 { value: 'Inspection', label: 'Inspection' },
                 { value: 'Other', label: 'Other' },

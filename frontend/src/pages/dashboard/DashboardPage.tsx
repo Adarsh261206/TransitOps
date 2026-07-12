@@ -8,13 +8,11 @@ import { KPISkeleton } from '@/components/shared/Skeletons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
 import { motion } from 'framer-motion';
 import { 
   Truck, Users, Route, Wrench, Fuel, Receipt, 
   Activity, CheckCircle, Clock, 
-  BarChart3, Plus, Search, ArrowUpRight, TrendingUp
+  BarChart3, Plus, ArrowUpRight, TrendingUp
 } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAuth } from '@/hooks/useAuth';
@@ -34,18 +32,17 @@ export function DashboardPage() {
   if (isLoading) return <PageTransition><KPISkeleton /></PageTransition>;
 
   const kpiCards = [
-    { label: 'Active Vehicles', value: kpis?.activeVehicles ?? 0, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/20', href: '/vehicles?status=ON_TRIP' },
+    { label: 'On Trip Vehicles', value: kpis?.onTripVehicles ?? 0, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/20', href: '/vehicles?status=ON_TRIP' },
     { label: 'Available Vehicles', value: kpis?.availableVehicles ?? 0, icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/20', href: '/vehicles?status=AVAILABLE' },
     { label: 'Vehicles in Maintenance', value: kpis?.inShopVehicles ?? 0, icon: Wrench, color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/20', href: '/vehicles?status=IN_SHOP' },
     { label: 'Active Trips', value: kpis?.activeTrips ?? 0, icon: Route, color: 'text-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/20', href: '/trips?status=DISPATCHED' },
-    { label: 'Pending Trips', value: kpis?.pendingTrips ?? 0, icon: Clock, color: 'text-orange-600', bg: 'bg-orange-100 dark:bg-orange-900/20', href: '/trips?status=DRAFT' },
-    { label: 'Drivers On Duty', value: kpis?.onTripDrivers ?? 0, icon: Users, color: 'text-cyan-600', bg: 'bg-cyan-100 dark:bg-cyan-900/20', href: '/drivers?status=ON_TRIP' },
+    { label: 'Pending Dispatch', value: kpis?.pendingDispatch ?? 0, icon: Clock, color: 'text-orange-600', bg: 'bg-orange-100 dark:bg-orange-900/20', href: '/trips?status=DRAFT' },
     { label: 'Fleet Utilization', value: `${kpis?.fleetUtilization ?? 0}%`, icon: Activity, color: 'text-rose-600', bg: 'bg-rose-100 dark:bg-rose-900/20', href: '/reports' },
   ];
 
   const pieData = [
     { name: 'Available', value: kpis?.availableVehicles ?? 0 },
-    { name: 'On Trip', value: kpis?.activeVehicles ?? 0 },
+    { name: 'On Trip', value: kpis?.onTripVehicles ?? 0 },
     { name: 'In Shop', value: kpis?.inShopVehicles ?? 0 },
     { name: 'Retired', value: kpis?.retiredVehicles ?? 0 },
   ];
@@ -69,27 +66,7 @@ export function DashboardPage() {
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-3 mt-4">
-          <div className="relative flex-1 min-w-[200px] max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search..." className="pl-9 h-9" />
-          </div>
-          <Select defaultValue="" className="w-32 h-9">
-            <option value="">All Types</option>
-            <option value="Truck">Truck</option>
-            <option value="Van">Van</option>
-          </Select>
-          <Select defaultValue="" className="w-32 h-9">
-            <option value="">All Status</option>
-            <option value="AVAILABLE">Available</option>
-            <option value="ON_TRIP">On Trip</option>
-          </Select>
-          <Select defaultValue="" className="w-32 h-9">
-            <option value="">All Regions</option>
-            <option value="North">North</option>
-            <option value="South">South</option>
-          </Select>
-        </div>
+      
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-8">
